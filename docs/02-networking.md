@@ -101,6 +101,14 @@ TCP/IP হলো ইন্টারনেটের ভিত্তি — এট
 - **4-way handshake** দিয়ে কানেকশন বন্ধ হয় (FIN, ACK, FIN, ACK)।
 - TCP vs UDP এর মূল পার্থক্য হলো reliability vs speed — TCP guarantee দেয় কিন্তু overhead বেশি।
 
+### আরও Advanced (Expert-Level)
+- **OSI vs TCP/IP model**: OSI 7-layer মডেল থিওরিটিক্যাল, বাস্তবে TCP/IP এর 4-layer (কখনো 5-layer বলা হয়: Physical, Data Link, Network, Transport, Application) মডেলই ব্যবহৃত হয়।
+- **Nagle's Algorithm**: ছোট ছোট প্যাকেট একত্রে পাঠিয়ে নেটওয়ার্ক efficiency বাড়ায়, কিন্তু real-time অ্যাপ্লিকেশনে delay তৈরি করতে পারে (তখন `TCP_NODELAY` সেট করা হয়)।
+- **TCP window scaling**: high-bandwidth, high-latency নেটওয়ার্কে (long fat networks) throughput বাড়াতে window size ৬৫৫৩৫ বাইটের সীমা ছাড়িয়ে scale করা যায়।
+- **TIME_WAIT state**: কানেকশন ক্লোজ হওয়ার পরও একটা নির্দিষ্ট সময় (সাধারণত 2MSL) সকেট TIME_WAIT স্টেটে থাকে — high-traffic সার্ভারে port exhaustion সমস্যা তৈরি করতে পারে।
+- **Head-of-line blocking at TCP layer**: এটাই মূল কারণ যে HTTP/2 এখনও TCP-তে সমস্যায় পড়ে, যা HTTP/3/QUIC সমাধান করে।
+- **SYN flood attack**: DoS attack যেখানে attacker অনেক SYN পাঠায় কিন্তু ACK পাঠায় না, সার্ভারের half-open connection queue ভরে ফেলে — SYN cookies দিয়ে প্রতিরোধ করা হয়।
+
 ### Real-life Example
 তুমি যখন কোনো ওয়েবসাইট ব্রাউজ করো বা ফাইল ডাউনলোড করো, তখন TCP নিশ্চিত করে প্রতিটা ডেটা প্যাকেট সঠিক অর্ডারে, কোনো ক্ষতি ছাড়া পৌঁছায় — যেমন কুরিয়ার সার্ভিস যেখানে প্রতিটা প্যাকেজের ট্র্যাকিং নাম্বার থাকে এবং ডেলিভারি কনফার্ম করা হয়।
 
@@ -124,6 +132,13 @@ UDP (User Datagram Protocol) হলো connectionless, lightweight প্রো�
 - UDP এ কোনো acknowledgment, retransmission বা ordering নেই — অ্যাপ্লিকেশন লেয়ারে এগুলো হ্যান্ডেল করতে হয় যদি দরকার হয়।
 - Header size মাত্র ৮ বাইট (TCP এর তুলনায় অনেক কম, TCP এর header ২০ বাইট+)।
 - **Use case selection**: রিয়েল-টাইম অ্যাপ্লিকেশনে সামান্য প্যাকেট লস acceptable কিন্তু delay নয় — তাই UDP প্রেফার করা হয়।
+
+### আরও Advanced (Expert-Level)
+- **Multicast/Broadcast support**: UDP এক সাথে একাধিক receiver-কে ডেটা পাঠাতে পারে (multicast), যা TCP এর connection-oriented প্রকৃতির কারণে সহজ নয় — video conferencing বা IPTV তে ব্যবহৃত হয়।
+- **Application-layer reliability**: DNS, DHCP, TFTP, VoIP এর মতো প্রোটোকল UDP এর উপর নিজস্ব reliability layer বসায় (যেমন RTP + RTCP ভিডিও/অডিও স্ট্রিমিং এ)।
+- **UDP-based protocols বিল্ডিং ব্লক**: QUIC/HTTP3 নিজেই UDP এর উপর নিজস্ব reliability, ordering ও encryption ইমপ্লিমেন্ট করে দেখায় যে UDP একটা flexible ফাউন্ডেশন হিসেবে কাজ করে।
+- **Checksum**: UDP এ optional checksum থাকে (IPv4 তে), যা corrupted প্যাকেট detect করে কিন্তু recover করে না — শুধু drop করে দেয়।
+- **UDP flood / amplification attack**: DNS বা NTP এর মতো সার্ভিসে ছোট রিকোয়েস্ট পাঠিয়ে বড় response ভিক্টিমের কাছে পাঠানো হয় (DDoS amplification) — spoofed source IP ব্যবহার করে।
 
 ### Real-life Example
 ভিডিও কল (Zoom, Google Meet), অনলাইন গেমিং, বা লাইভ স্ট্রিমিং — এখানে একটা ফ্রেম মিস হলেও সমস্যা নেই, কিন্তু ডিলে হলে অভিজ্ঞতা খারাপ হয়ে যায়। তাই UDP ব্যবহার হয়।
@@ -149,6 +164,12 @@ HTTP/1.1 হলো ওয়েব কমিউনিকেশনের স্�
 - **Pipelining** সাপোর্ট করে কিন্তু বাস্তবে খুব একটা ব্যবহৃত হয় না কারণ ordering সমস্যা তৈরি করে।
 - Browsers সাধারণত একই ডোমেইনে ৬টা পর্যন্ত parallel TCP connection খোলে HOL blocking এড়াতে।
 
+### আরও Advanced (Expert-Level)
+- **Chunked Transfer Encoding**: রেসপন্সের সাইজ আগে থেকে না জানলেও ডেটা ছোট ছোট chunk-এ পাঠানো যায় (`Transfer-Encoding: chunked`), যা streaming response এ কাজে লাগে।
+- **Domain sharding**: HTTP/1.1 এর 6-connection সীমা এড়াতে ডেভেলপাররা আগে অ্যাসেট বিভিন্ন সাবডোমেইনে ভাগ করে দিতেন (যেমন `img1.site.com`, `img2.site.com`) — HTTP/2 এর পর এটা আর দরকার হয় না, বরং ক্ষতিকর।
+- **Caching headers**: `ETag`, `Last-Modified`, `Cache-Control` দিয়ে ব্রাউজার কন্টেন্ট revalidate করে বা cache থেকে সরাসরি সার্ভ করে — নেটওয়ার্ক রাউন্ড-ট্রিপ বাঁচায়।
+- **Content negotiation**: `Accept`, `Accept-Encoding`, `Accept-Language` হেডার দিয়ে ক্লায়েন্ট-সার্ভার একই রিসোর্সের বিভিন্ন ফরম্যাট/ভাষা নেগোশিয়েট করতে পারে।
+
 ### Real-life Example
 তুমি যখন একটা ই-কমার্স সাইট লোড করো, ব্রাউজার একই সার্ভারে একাধিক connection খুলে CSS, JS, ইমেজ ফাইল আলাদাভাবে fetch করে — যেন এক দোকানে অনেক কাউন্টার আছে, কিন্তু প্রতিটা কাউন্টারে এক এক সময় একজনই সার্ভিস পায়।
 
@@ -172,6 +193,12 @@ HTTP/2 হলো HTTP/1.1 এর পারফরম্যান্স ইমপ�
 - **Header Compression (HPACK)**: রিপিটেড হেডার ডেটা কমপ্রেস করে ব্যান্ডউইথ বাঁচায়।
 - **Server Push**: সার্ভার ক্লায়েন্টের রিকোয়েস্ট ছাড়াই প্রয়োজনীয় রিসোর্স আগে থেকেই পাঠাতে পারে (যদিও এখন কম ব্যবহৃত)।
 - **Stream Prioritization**: গুরুত্বপূর্ণ রিসোর্স আগে লোড করার জন্য প্রায়োরিটি সেট করা যায়।
+
+### আরও Advanced (Expert-Level)
+- **Flow control per-stream**: HTTP/2 প্রতিটা স্ট্রিমের জন্য আলাদা flow control window রাখে, একটা কানেকশন-লেভেল window এর পাশাপাশি — যাতে একটা স্ট্রিম পুরো কানেকশন দখল করে না নেয়।
+- **Binary framing layer**: টেক্সট-বেসড HTTP/1.1 এর বদলে HTTP/2 ডেটাকে ছোট ছোট binary frame এ ভাগ করে পাঠায় (HEADERS frame, DATA frame, ইত্যাদি), যা পার্সিং দ্রুত ও কম error-prone করে।
+- **Stream dependency tree**: prioritization শুধু একটা weight নয়, বরং stream গুলোর মধ্যে dependency tree তৈরি করা যায় (কোন স্ট্রিম কার উপর নির্ভরশীল)।
+- **TLS প্রায় mandatory**: বেশিরভাগ ব্রাউজার শুধু HTTPS এর উপর HTTP/2 সাপোর্ট করে (যদিও স্পেসিফিকেশনে plaintext সাপোর্ট আছে)।
 
 ### Real-life Example
 একটা বড় নিউজ ওয়েবসাইট যেখানে অনেক ইমেজ, স্ক্রিপ্ট, স্টাইলশিট লোড হয় — HTTP/2 এ এই সব একইসাথে একটা কানেকশনে পাঠানো যায়, ফলে পেজ লোড টাইম কমে যায়, যেমন একটা মাল্টি-লেন হাইওয়ে যেখানে একসাথে অনেক গাড়ি চলতে পারে।
@@ -197,6 +224,12 @@ HTTP/3 হলো HTTP এর সর্বশেষ ভার্সন যা TCP
 - **Connection migration**: ইউজার WiFi থেকে মোবাইল ডেটায় সুইচ করলেও কানেকশন ব্রেক হয় না (connection ID দিয়ে ট্র্যাক হয়, IP দিয়ে নয়)।
 - Built-in TLS 1.3 encryption — সিকিউরিটি আরও শক্তিশালী এবং integrated।
 
+### আরও Advanced (Expert-Level)
+- **UDP-based deployment challenges**: অনেক corporate firewall/NAT UDP ট্রাফিক ব্লক বা throttle করে, তাই HTTP/3 প্রায়ই TCP/HTTP2 তে fallback করার লজিক রাখতে হয়।
+- **Amplification attack mitigation**: QUIC হ্যান্ডশেকে address validation ব্যবহার করা হয় যাতে UDP-based amplification attack প্রতিরোধ করা যায়।
+- **Kernel-space vs user-space**: TCP সাধারণত OS kernel এ ইমপ্লিমেন্টেড, কিন্তু QUIC/HTTP3 user-space এ চলে — এটা দ্রুত আপডেট/ইনোভেশন সম্ভব করে কিন্তু CPU overhead বেশি হতে পারে।
+- **Adoption**: বড় বড় CDN এবং cloud provider (Cloudflare, Google, Fastly) HTTP/3 সাপোর্ট করে, তবে এখনো TCP/HTTP2 ব্যাকআপ হিসেবে থাকে বিস্তৃত compatibility এর জন্য।
+
 ### Real-life Example
 Google, YouTube, Facebook এখন HTTP/3 ব্যবহার করে — তুমি মেট্রোতে যাচ্ছ, WiFi থেকে মোবাইল ডেটায় সুইচ হচ্ছে, কিন্তু ভিডিও বাফার না করেই চলতে থাকে কারণ QUIC connection migration সাপোর্ট করে।
 
@@ -220,6 +253,12 @@ QUIC (Quick UDP Internet Connections) হলো Google-তৈরি একটা
 - **Independent streams**: multiplexed streams একে অপরের থেকে সম্পূর্ণ আলাদা, তাই এক স্ট্রিমের প্যাকেট লস অন্য স্ট্রিমকে ব্লক করে না।
 - Encryption (TLS 1.3) built-in — handshake এবং encryption একসাথে হয়, তাই সময় বাঁচে।
 - HTTP/3 এর ফাউন্ডেশন প্রোটোকল হলো QUIC।
+
+### আরও Advanced (Expert-Level)
+- **Connection ID**: QUIC কানেকশনকে IP:port এর বদলে একটা Connection ID দিয়ে ট্র্যাক করে, যার ফলে NAT rebinding বা network change হলেও কানেকশন টিকে থাকে (connection migration এর মূল কারণ)।
+- **Loss detection ও congestion control**: TCP এর মতোই কিন্তু QUIC এ এটা আরও flexible ও pluggable — Google এর BBR এর মতো আধুনিক congestion control algorithm সহজে ইন্টিগ্রেট করা যায়।
+- **QUIC এর security by design**: হ্যান্ডশেকের বেশিরভাগ অংশ encrypted, এমনকি TCP এর মতো header ও metadata কিছুটা লুকানো থাকে, যা middlebox ossification (নেটওয়ার্ক ডিভাইস প্রোটোকল পরিবর্তনে বাধা দেওয়া) প্রতিরোধ করে।
+- **HTTP/3 ছাড়াও ব্যবহার**: QUIC শুধু ওয়েবের জন্য নয় — DNS-over-QUIC, বা অন্য কাস্টম প্রোটোকলেও ব্যবহার করা যায়।
 
 ### Real-life Example
 মোবাইল ইন্টারনেটে দুর্বল নেটওয়ার্কে থাকা অবস্থায় ওয়েবসাইট ব্রাউজ করার সময় QUIC দ্রুত রিকভার করে প্যাকেট লস থেকে — অনেকটা এমন যেন একাধিক আলাদা কুরিয়ার লেন থাকা, যেখানে একটা লেনে জ্যাম হলেও বাকি লেনগুলো চলতে থাকে।
@@ -249,6 +288,13 @@ DNS resolution প্রসেস কয়েকটা ধাপে হয়:
 - **TTL (Time To Live)**: কতক্ষণ একটা রেকর্ড cache রাখা হবে সেটা নিয়ন্ত্রণ করে।
 - **DNS caching** বিভিন্ন লেভেলে হয় (browser, OS, resolver) — পারফরম্যান্স বাড়ায়।
 
+### আরও Advanced (Expert-Level)
+- **DNS over HTTPS (DoH) / DNS over TLS (DoT)**: DNS কোয়েরি সাধারণত plaintext-এ যায় (privacy risk), DoH/DoT এনক্রিপ্ট করে পাঠায় — ব্রাউজার-level privacy বাড়ায়।
+- **DNSSEC**: DNS response এর authenticity ভেরিফাই করার জন্য cryptographic signature ব্যবহার করে, DNS spoofing/cache poisoning প্রতিরোধ করে।
+- **DNS load balancing / GeoDNS**: একই ডোমেইনের জন্য ইউজারের লোকেশন অনুযায়ী ভিন্ন IP রিটার্ন করা হয় — closest server-এ রাউট করার জন্য, CDN এর সাথে মিলে কাজ করে।
+- **Anycast routing**: root DNS server গুলো anycast ব্যবহার করে — একই IP address বিশ্বের একাধিক লোকেশন থেকে serve করা হয়, ইউজার নিকটতমটাতে পৌঁছায়।
+- **Negative caching**: DNS "NXDOMAIN" (domain not found) response ও একটা নির্দিষ্ট সময় cache করে রাখা হয়, বারবার একই ফেইলড কোয়েরি এড়াতে।
+
 ### Real-life Example
 তুমি ব্রাউজারে `facebook.com` টাইপ করলে DNS সেটাকে `157.240.x.x` এর মতো একটা IP address এ কনভার্ট করে দেয় — অনেকটা ফোনবুকে নাম দিয়ে নাম্বার খোঁজার মতো, কারণ তুমি নাম্বার মুখস্থ রাখতে চাও না।
 
@@ -274,6 +320,12 @@ CDN (Content Delivery Network) হলো বিশ্বব্যাপী ছ�
 - **Cache invalidation/purging**: কন্টেন্ট আপডেট হলে পুরনো cache কীভাবে রিফ্রেশ করা হয়।
 - CDN শুধু static content নয়, **dynamic content acceleration** ও করতে পারে (routing optimization দিয়ে)।
 - **DDoS protection** এবং load balancing এর কাজও CDN করে (Cloudflare, Akamai)।
+
+### আরও Advanced (Expert-Level)
+- **Cache-Control strategies**: `max-age`, `s-maxage`, `stale-while-revalidate` এর মতো ডিরেক্টিভ দিয়ে কতক্ষণ এজ সার্ভার কন্টেন্ট ধরে রাখবে এবং কীভাবে রিফ্রেশ করবে তা নিয়ন্ত্রণ করা যায়।
+- **Edge computing**: আধুনিক CDN (Cloudflare Workers, AWS Lambda@Edge) এজ সার্ভারে কোড execute করার সুযোগ দেয় — ইউজারের কাছাকাছি লজিক প্রসেস করে লেটেন্সি আরও কমায়।
+- **Anycast এর ভূমিকা**: CDN নেটওয়ার্কেও anycast IP ব্যবহার করা হয় যাতে ইউজারের রিকোয়েস্ট স্বয়ংক্রিয়ভাবে নিকটতম এজ সার্ভারে রাউট হয়।
+- **Cache key customization**: query parameter, header, বা cookie অনুযায়ী কীভাবে ভিন্ন ভিন্ন cache variant তৈরি হবে তা কাস্টমাইজ করা যায় (personalized content caching)।
 
 ### Real-life Example
 Netflix বা YouTube ভিডিও যখন তুমি দেখো, সেটা আমেরিকার কোনো ডেটা সেন্টার থেকে না এসে তোমার কাছাকাছি (হয়তো ঢাকার) একটা edge সার্ভার থেকে আসে — তাই বাফারিং কম হয়।
@@ -304,6 +356,13 @@ SSL/TLS হলো এনক্রিপশন প্রোটোকল যা �
 - **TLS 1.3** এ handshake আরও দ্রুত (1-RTT, এমনকি 0-RTT resumption সম্ভব) এবং পুরনো insecure cipher বাদ দেওয়া হয়েছে।
 - **Certificate Authority (CA)** সার্টিফিকেট ভেরিফাই করে ট্রাস্ট চেইন নিশ্চিত করে।
 
+### আরও Advanced (Expert-Level)
+- **Perfect Forward Secrecy (PFS)**: প্রতিটা সেশনের জন্য নতুন ephemeral key ব্যবহার করা হয় (যেমন Diffie-Hellman Ephemeral), যাতে ভবিষ্যতে private key leak হলেও পুরনো সেশনের ডেটা ডিক্রিপ্ট করা না যায়।
+- **Certificate chain of trust**: Root CA → Intermediate CA → Leaf (server) certificate — ব্রাউজার এই পুরো চেইন ভেরিফাই করে, Root CA গুলো OS/browser এ pre-installed থাকে।
+- **Mutual TLS (mTLS)**: শুধু সার্ভার নয়, ক্লায়েন্টও একটা সার্টিফিকেট দিয়ে নিজেকে প্রমাণ করে — মূলত microservice-to-microservice বা high-security API তে ব্যবহৃত হয়।
+- **SNI (Server Name Indication)**: TLS handshake এর শুরুতে ক্লায়েন্ট কোন hostname চাইছে তা পাঠায়, যাতে একই IP তে multiple SSL certificate সহ multiple ডোমেইন হোস্ট করা যায়।
+- **OCSP / Certificate Revocation**: কোনো সার্টিফিকেট compromise হলে সেটা revoke করার মেকানিজম (CRL, OCSP) থাকে যাতে ব্রাউজার সেটা আর trust না করে।
+
 ### Real-life Example
 ব্যাংকিং ওয়েবসাইটে যখন তুমি লগইন করো, ব্রাউজারের URL বারে "🔒 https://" দেখায় — এটা TLS এর কারণে, যা তোমার পাসওয়ার্ড এবং ডেটা middle-man attack থেকে সুরক্ষিত রাখে।
 
@@ -329,6 +388,12 @@ HTTPS হলো HTTP + TLS/SSL — অর্থাৎ HTTP প্রোটোক
 - SEO এবং browser trust এ HTTPS এর প্রভাব আছে (Chrome এ HTTP সাইট "Not Secure" দেখায়)।
 - **HSTS (HTTP Strict Transport Security)** হেডার ব্যবহার করে সার্ভার ব্রাউজারকে বলে দেয় সবসময় HTTPS ব্যবহার করতে।
 
+### আরও Advanced (Expert-Level)
+- **HSTS Preload list**: ব্রাউজার ভেন্ডররা একটা hardcoded list রাখে যেসব ডোমেইন সবসময় HTTPS-only, তাই প্রথম ভিজিটেও HTTP downgrade attack সম্ভব হয় না।
+- **Mixed content issue**: HTTPS পেজে HTTP রিসোর্স (ইমেজ, স্ক্রিপ্ট) লোড করলে ব্রাউজার ব্লক করে বা ওয়ার্নিং দেয় — পুরো পেজের সিকিউরিটি গ্যারান্টি ভেঙে যেতে পারে বলে।
+- **TLS termination point**: বড় সিস্টেমে HTTPS প্রায়ই লোড ব্যালেন্সার/CDN এ terminate হয় (এনক্রিপশন সেখানেই decrypt হয়), এরপর ইন্টার্নাল নেটওয়ার্কে plain HTTP ব্যবহার হতে পারে — এটা design trade-off।
+- **Certificate pinning**: মোবাইল অ্যাপে নির্দিষ্ট certificate/public key hardcode করে রাখা হয়, যাতে compromised CA দিয়েও man-in-the-middle attack সম্ভব না হয়।
+
 ### Real-life Example
 ই-কমার্স সাইটে ক্রেডিট কার্ড ইনফরমেশন দেওয়ার সময় HTTPS নিশ্চিত করে সেই ডেটা কেউ মাঝপথে চুরি করতে পারবে না।
 
@@ -351,6 +416,12 @@ WebSocket হলো একটা প্রোটোকল যা ক্লায
 - একবার কানেকশন প্রতিষ্ঠিত হলে, এটা TCP এর উপর একটা persistent কানেকশন থেকে যায় — HTTP এর মতো request-response প্রতিবার লাগে না।
 - Low latency, real-time bidirectional communication এর জন্য ideal।
 - Scaling চ্যালেঞ্জ থাকে কারণ প্রতিটা কানেকশন সার্ভারে state রাখতে হয় (stateful), যা load balancing কে জটিল করে তোলে।
+
+### আরও Advanced (Expert-Level)
+- **Heartbeat/Ping-Pong frames**: কানেকশন জীবিত আছে কিনা যাচাই করতে এবং idle কানেকশন প্রক্সি/লোড ব্যালেন্সার দ্বারা টাইমআউট হওয়া এড়াতে নিয়মিত ping-pong frame পাঠানো হয়।
+- **Horizontal scaling সমাধান**: multiple WebSocket সার্ভারের মধ্যে মেসেজ broadcast করতে Redis Pub/Sub বা message broker (Kafka, RabbitMQ) ব্যবহার করা হয়, যাতে ভিন্ন সার্ভারে কানেক্টেড ক্লায়েন্টরাও মেসেজ পায়।
+- **Backpressure handling**: স্লো ক্লায়েন্ট বা ধীর নেটওয়ার্কে বেশি ডেটা পাঠালে সার্ভার মেমরি বাফার ওভারফ্লো হতে পারে — buffer limit এবং rate limiting দরকার হয়।
+- **Fallback mechanism**: পুরনো ব্রাউজার বা কড়া ফায়ারওয়ালে WebSocket ব্লক হলে long-polling এ fallback করার লজিক (Socket.IO এর মতো লাইব্রেরি এটা অটোমেটিক হ্যান্ডেল করে)।
 
 ### Real-life Example
 চ্যাট অ্যাপ্লিকেশন (যেমন WhatsApp Web) বা লাইভ স্টক প্রাইস আপডেট — সার্ভার নতুন মেসেজ আসামাত্র ক্লায়েন্টকে push করতে পারে, ক্লায়েন্টকে বারবার "নতুন মেসেজ আছে কিনা" জিজ্ঞাসা করতে হয় না।
@@ -376,6 +447,11 @@ SSE হলো একটা টেকনোলজি যেখানে সার
 - WebSocket এর চেয়ে সহজ ইমপ্লিমেন্ট করা, কিন্তু bidirectional কমিউনিকেশন দরকার হলে এটা কাজ করবে না।
 - HTTP/2 এর সাথে ভালো কাজ করে কারণ multiplexing এর কারণে অনেক SSE কানেকশন efficient ভাবে চলতে পারে।
 
+### আরও Advanced (Expert-Level)
+- **Event ID এবং resumption**: প্রতিটা event এ একটা `id` দেওয়া যায়, ব্রাউজার ডিসকানেক্ট হলে reconnect করার সময় `Last-Event-ID` হেডার পাঠায়, যাতে সার্ভার মিসড event গুলো আবার পাঠাতে পারে।
+- **HTTP/1.1 এ কানেকশন সীমা সমস্যা**: HTTP/1.1 এ একটা ডোমেইনে ৬টা কানেকশনের সীমার কারণে অনেক ট্যাবে SSE ব্যবহার করলে সমস্যা হতে পারে — HTTP/2 এই সমস্যা দূর করে।
+- **Load balancer/proxy compatibility**: কিছু প্রক্সি/লোড ব্যালেন্সার দীর্ঘ persistent HTTP কানেকশন buffer করে ফেলে, যার ফলে real-time delivery ব্যাহত হতে পারে — এজন্য `X-Accel-Buffering: no` এর মতো হেডার ব্যবহার করতে হয়।
+
 ### Real-life Example
 লাইভ স্পোর্টস স্কোর আপডেট, নোটিফিকেশন ফিড, বা স্টক টিকার — যেখানে শুধু সার্ভার থেকে ক্লায়েন্টে ডেটা যাচ্ছে, ক্লায়েন্টের কিছু পাঠানোর দরকার নেই।
 
@@ -399,6 +475,12 @@ gRPC হলো Google-তৈরি একটা high-performance RPC (Remote Pro
 - HTTP/2 এর multiplexing ব্যবহার করে একই কানেকশনে অনেকগুলো call parallel ভাবে করা যায়।
 - **Strongly typed contracts** (.proto ফাইলের মাধ্যমে) — client এবং server এর মধ্যে interface strictly ডিফাইনড থাকে, code generation করা যায় বিভিন্ন ভাষায়।
 - Microservices architecture তে ইন্টার্নাল সার্ভিস কমিউনিকেশনের জন্য খুব জনপ্রিয়।
+
+### আরও Advanced (Expert-Level)
+- **Deadline/Timeout propagation**: gRPC কলে deadline সেট করা যায় যা কল চেইনের মধ্য দিয়ে propagate হয় — একটা downstream সার্ভিস স্লো হলে পুরো চেইন দ্রুত fail করে (cascading failure এড়ায়)।
+- **Interceptors (Middleware)**: authentication, logging, retry logic centralized ভাবে ইমপ্লিমেন্ট করার জন্য gRPC তে client/server interceptor ব্যবহার হয়।
+- **Load balancing challenges**: gRPC persistent HTTP/2 কানেকশন ব্যবহার করে বলে traditional L4 (TCP-level) লোড ব্যালেন্সার effective ভাবে কানেকশনের ভেতরের রিকোয়েস্ট বিতরণ করতে পারে না — client-side load balancing বা L7 প্রক্সি (Envoy) দরকার হয়।
+- **Browser limitation**: ব্রাউজার সরাসরি raw gRPC কল করতে পারে না (HTTP/2 trailer এর লিমিটেশনের কারণে) — এজন্য **gRPC-Web** ব্যবহার করতে হয়, যা একটা প্রক্সির মাধ্যমে ট্রান্সলেট হয়।
 
 ### Real-life Example
 Netflix বা Uber এর মতো কোম্পানিতে যেখানে শত শত microservice একে অপরের সাথে কথা বলে, সেখানে gRPC ব্যবহার করা হয় কারণ REST/JSON এর চেয়ে এটা অনেক ফাস্ট এবং efficient — অনেকটা কোম্পানির অভ্যন্তরীণ ইন্টারকম সিস্টেমের মতো, যেখানে পাবলিক ফোন কলের (REST) চেয়ে দ্রুত ও structured কমিউনিকেশন হয়।
@@ -427,6 +509,13 @@ REST এর মূল principles:
 - **HATEOAS** (Hypermedia as the Engine of Application State) — response এ পরবর্তী সম্ভাব্য action এর লিংক থাকে (কম ব্যবহৃত হলেও pure REST এর অংশ)।
 - **Idempotency**: GET, PUT, DELETE idempotent (বারবার করলেও একই result), কিন্তু POST নয়।
 
+### আরও Advanced (Expert-Level)
+- **API Versioning strategies**: URI versioning (`/v1/users`), header versioning (`Accept: application/vnd.api.v1+json`), বা query parameter versioning — প্রতিটার নিজস্ব trade-off আছে।
+- **Pagination patterns**: Offset-based (`?page=2&limit=20`) সহজ কিন্তু বড় ডেটাসেটে স্লো; Cursor-based pagination বেশি efficient এবং consistent, বিশেষত রিয়েল-টাইম changing data তে।
+- **Rate limiting**: `429 Too Many Requests` স্ট্যাটাস কোড এবং `X-RateLimit-*` হেডার দিয়ে API abuse প্রতিরোধ করা হয় (token bucket, sliding window algorithm দিয়ে ইমপ্লিমেন্টেড)।
+- **HATEOAS বাস্তবতা**: বেশিরভাগ প্রোডাকশন API pure REST/HATEOAS মেনে চলে না — সেগুলোকে বলা হয় "RESTful" বা pragmatic REST।
+- **Richardson Maturity Model**: REST API maturity মাপার একটা ফ্রেমওয়ার্ক (Level 0: single endpoint, Level 1: resources, Level 2: HTTP verbs, Level 3: HATEOAS)।
+
 ### Real-life Example
 একটা ই-কমার্স অ্যাপ যেখানে `GET /products` দিয়ে প্রোডাক্ট লিস্ট পাওয়া যায়, `POST /orders` দিয়ে নতুন অর্ডার তৈরি হয়, `PUT /users/123` দিয়ে ইউজার প্রোফাইল আপডেট হয়।
 
@@ -453,6 +542,12 @@ GraphQL হলো একটা query language এবং runtime যেখান�
 - **Resolvers**: প্রতিটা field এর জন্য একটা resolver ফাংশন থাকে যা ডেটা fetch করে।
 - **N+1 query problem**: একটা সাধারণ চ্যালেঞ্জ যেখানে nested field resolve করতে গিয়ে অনেক ডাটাবেস কল হয়ে যায় — এটা DataLoader/batching দিয়ে সমাধান করা হয়।
 - **Subscriptions** দিয়ে real-time ডেটা আপডেট পাওয়া যায় (WebSocket এর উপর ভিত্তি করে)।
+
+### আরও Advanced (Expert-Level)
+- **Caching জটিলতা**: REST এ URL-based caching সহজ (HTTP cache headers ব্যবহার করে), কিন্তু GraphQL এ single endpoint ও dynamic query হওয়ায় caching জটিল — client-side caching (Apollo Client, Relay) দিয়ে সমাধান করা হয়, প্রায়ই `id` field দিয়ে normalized caching করে।
+- **Query complexity/depth limiting**: ম্যালিশিয়াস বা অজান্তে খুব deeply nested query সার্ভারকে overload করতে পারে — query depth limit বা cost analysis দিয়ে এটা প্রতিরোধ করা হয়।
+- **Persisted Queries**: প্রোডাকশনে পুরো query string বারবার না পাঠিয়ে একটা hash/ID পাঠানো হয় (সার্ভারে আগে থেকে রেজিস্টার করা), যা bandwidth বাঁচায় এবং সিকিউরিটি বাড়ায়।
+- **Federation**: বড় সিস্টেমে একাধিক টিম আলাদা GraphQL schema ম্যানেজ করে, যেগুলো একটা unified gateway (Apollo Federation) এ combine করা হয়।
 
 ### Real-life Example
 Facebook এর mobile app এ যদি শুধু ইউজারের নাম আর প্রোফাইল ছবি দরকার হয় (পুরো প্রোফাইল ডেটা না), GraphQL দিয়ে ঠিক সেই দুইটা field-ই রিকোয়েস্ট করা যায়, ফলে মোবাইল ডেটা বাঁচে। (GraphQL মূলত Facebook-ই তৈরি করেছিল এই কারণেই।)
@@ -488,6 +583,12 @@ OAuth 2.0 এর মূল উপাদান:
 
 Token flow: Client → Authorization Server (authorization code পায়) → Authorization Server (code exchange করে access token পায়) → Resource Server এ token দিয়ে অ্যাক্সেস করে।
 
+### আরও Advanced (Expert-Level)
+- **Scopes**: OAuth এ permission granular ভাবে নিয়ন্ত্রণ করা হয় scope দিয়ে (যেমন `read:email`, `write:calendar`) — অ্যাপকে শুধু প্রয়োজনীয় অ্যাক্সেস দেওয়া হয় (principle of least privilege)।
+- **Refresh Token rotation**: প্রতিবার refresh token ব্যবহার করলে নতুন refresh token ইস্যু করা হয় এবং পুরনোটা invalidate করা হয় — token leak হলে ক্ষতি কমাতে সাহায্য করে।
+- **OpenID Connect (OIDC)**: OAuth এর উপর তৈরি একটা identity layer যা authentication যোগ করে (OAuth শুধু authorization) — এখানে একটা extra **ID Token** (JWT ফরম্যাটে) থাকে ইউজারের identity তথ্য নিয়ে।
+- **State parameter**: CSRF attack প্রতিরোধ করতে authorization request এ একটা random `state` value পাঠানো হয়, যা callback এ ভেরিফাই করা হয়।
+
 ### Real-life Example
 "Sign in with Google" বাটন দিয়ে যখন তুমি কোনো থার্ড-পার্টি অ্যাপে লগইন করো, সেই অ্যাপ তোমার Google পাসওয়ার্ড কখনো দেখে না — Google শুধু একটা token দেয় যা দিয়ে সীমিত অনুমতি (যেমন শুধু ইমেইল আর নাম) পাওয়া যায়।
 
@@ -518,6 +619,12 @@ JWT এর ৩টা অংশ (dot দিয়ে আলাদা করা, B
 - **Expiration (`exp` claim)** ব্যবহার করে token এর মেয়াদ নিয়ন্ত্রণ করা হয়।
 - **Revocation সমস্যা**: JWT stateless হওয়ায় logout/revoke করা কঠিন — এজন্য short expiry + refresh token pattern বা blacklist ব্যবহার করা হয়।
 
+### আরও Advanced (Expert-Level)
+- **Algorithm confusion attack**: `alg: none` বা RS256/HS256 এর মধ্যে confusion তৈরি করে সিগনেচার verification বাইপাস করার আক্রমণ — সার্ভারে সবসময় নির্দিষ্ট algorithm hardcode/whitelist করে রাখা উচিত।
+- **JWE vs JWS**: JWS (JSON Web Signature) শুধু সাইন করা (integrity দেয়, কিন্তু payload readable), JWE (JSON Web Encryption) পুরো payload এনক্রিপ্ট করে — sensitive data এর জন্য JWE দরকার।
+- **Token storage security**: JWT localStorage এ রাখলে XSS attack এ চুরি হতে পারে, HttpOnly cookie তে রাখলে বেশি নিরাপদ কিন্তু CSRF handle করতে হয় — trade-off বোঝা জরুরি।
+- **Key rotation (`kid` claim)**: signing key পরিবর্তন করার সময় একাধিক key সাপোর্ট করতে হয়, `kid` (Key ID) হেডার দিয়ে কোন key ব্যবহৃত হয়েছে তা identify করা হয়।
+
 ### Real-life Example
 একটা API-তে লগইন করার পর সার্ভার একটা JWT দেয়, এরপর প্রতিটা রিকোয়েস্টে `Authorization: Bearer <token>` হেডারে সেটা পাঠানো হয় — সার্ভার ডাটাবেসে সেশন চেক না করেই টোকেন verify করে বুঝে যায় ইউজার কে এবং কী পারমিশন আছে।
 
@@ -543,6 +650,12 @@ CORS (Cross-Origin Resource Sharing) হলো একটা ব্রাউজ�
 - **Headers** যা CORS নিয়ন্ত্রণ করে: `Access-Control-Allow-Origin`, `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, `Access-Control-Allow-Credentials`।
 - **Simple requests** (GET, POST with standard content-type) preflight ছাড়াই সরাসরি যায়।
 - CORS শুধু ব্রাউজার-level protection — server-to-server কল CORS দিয়ে বাধাপ্রাপ্ত হয় না।
+
+### আরও Advanced (Expert-Level)
+- **Credentialed requests**: cookie/authorization header সহ cross-origin রিকোয়েস্ট পাঠাতে `Access-Control-Allow-Credentials: true` এবং `Access-Control-Allow-Origin` এ wildcard (`*`) এর বদলে নির্দিষ্ট origin লাগে — দুটো একসাথে wildcard এ কাজ করে না।
+- **CORS vs CSRF**: এই দুটো ভিন্ন সমস্যা সমাধান করে — CORS ব্রাউজারকে বলে কোন origin থেকে response পড়া যাবে, CSRF token নিশ্চিত করে রিকোয়েস্টটা legitimate সোর্স থেকে এসেছে। একটা থাকলে অন্যটা দরকার নেই এমন না।
+- **Wildcard vs specific origin trade-off**: `*` ব্যবহার করলে যেকোনো সাইট রিসোর্স অ্যাক্সেস করতে পারবে (public API তে ঠিক আছে), কিন্তু sensitive ডেটার ক্ষেত্রে নির্দিষ্ট origin whitelist করা উচিত।
+- **CORS misconfigurations security risk**: ভুলভাবে সব origin কে allow করা (বিশেষত credentials সহ) sensitive ডেটা leak করার একটা সাধারণ vulnerability।
 
 ### Real-life Example
 তোমার ফ্রন্টএন্ড `https://myapp.com` এ চলছে কিন্তু API আছে `https://api.myapp.com` এ — ব্রাউজার ডিফল্টভাবে এই cross-origin কল ব্লক করবে, যতক্ষণ না API সার্ভার `Access-Control-Allow-Origin: https://myapp.com` হেডার পাঠায়।
@@ -571,6 +684,12 @@ Cookie হলো ছোট একটা key-value ডেটা যা সার�
   - `Expires`/`Max-Age`: কতক্ষণ cookie বৈধ থাকবে
 - Cookie সাইজ সীমিত (~4KB), তাই বড় ডেটার জন্য উপযুক্ত না।
 - **First-party vs Third-party cookies**: থার্ড-পার্টি cookies (advertising tracking এ ব্যবহৃত) এখন privacy কারণে ব্রাউজারে বেশি রেস্ট্রিক্টেড হচ্ছে।
+
+### আরও Advanced (Expert-Level)
+- **Cookie prefixes (`__Secure-`, `__Host-`)**: ব্রাউজার-enforced নামকরণ কনভেনশন যা নিশ্চিত করে cookie নির্দিষ্ট শর্ত (HTTPS, নো domain attribute) মেনে সেট হয়েছে কিনা — অতিরিক্ত protection layer।
+- **Third-party cookie deprecation**: Chrome-সহ প্রধান ব্রাউজারগুলো থার্ড-পার্টি cookie ধাপে ধাপে বন্ধ করছে privacy কারণে — এর বিকল্প হিসেবে Privacy Sandbox/Topics API এর মতো টেকনোলজি আসছে।
+- **CSRF এবং cookie এর সম্পর্ক**: ব্রাউজার স্বয়ংক্রিয়ভাবে cookie পাঠায় বলেই CSRF attack সম্ভব হয় — `SameSite=Strict/Lax` এই ঝুঁকি অনেকটা কমায়।
+- **Cookie জার সাইজ সীমা**: প্রতি ডোমেইনে সাধারণত ৫০টা পর্যন্ত cookie এবং ব্রাউজার প্রতি মোট ~৪KB/cookie সীমা থাকে — বেশি ডেটার জন্য server-side session বা localStorage বিবেচনা করা উচিত।
 
 ### Real-life Example
 তুমি একটা ওয়েবসাইটে লগইন করার পর পেজ রিফ্রেশ করলেও লগইন অবস্থায় থাকো — এটা সম্ভব হয় কারণ সার্ভার একটা session cookie সেট করে দিয়েছে যা প্রতি রিকোয়েস্টে যাচাই হয়।
@@ -605,6 +724,12 @@ Session management হলো ব্যবহারকারীর লগইন �
 - **Session hijacking**: cookie চুরি হয়ে অন্য কেউ সেশন ব্যবহার করা — `HttpOnly`, `Secure`, `SameSite` cookie দিয়ে প্রতিরোধ করা হয়।
 - **Session timeout**: নির্দিষ্ট সময় পর সেশন expire করা (idle timeout, absolute timeout)।
 
+### আরও Advanced (Expert-Level)
+- **Distributed session store**: multi-server আর্কিটেকচারে Redis/Memcached এর মতো centralized, fast in-memory store ব্যবহার করা হয় যাতে যেকোনো সার্ভার যেকোনো ইউজারের সেশন অ্যাক্সেস করতে পারে (sticky session এর বিকল্প)।
+- **Sticky session এর trade-off**: লোড ব্যালেন্সার একই ইউজারকে বারবার একই সার্ভারে পাঠায় — সহজ কিন্তু সার্ভার ক্র্যাশ করলে সেশন হারিয়ে যায় এবং uneven load distribution হতে পারে।
+- **Hybrid approach**: অনেক প্রোডাকশন সিস্টেম JWT (stateless, দ্রুত ভেরিফিকেশন) এবং একটা server-side revocation list/refresh token store (stateful অংশ) একসাথে ব্যবহার করে — best of both worlds পাওয়ার চেষ্টা।
+- **Session vs Token তুলনায় consistency**: distributed session store এ latency/consistency trade-off থাকে (Redis replica lag), যা race condition তৈরি করতে পারে high-traffic সিস্টেমে।
+
 ### Real-life Example
 অনলাইন ব্যাংকিং অ্যাপে কিছুক্ষণ কোনো কাজ না করলে "Session expired, please login again" মেসেজ আসে — এটা idle timeout এর উদাহরণ, যা সিকিউরিটির জন্য গুরুত্বপূর্ণ, বিশেষত পাবলিক কম্পিউটারে।
 
@@ -630,6 +755,14 @@ Session management হলো ব্যবহারকারীর লগইন �
 6. OAuth এবং JWT একসাথে কীভাবে একটা secure authentication system তৈরি করে?
 7. CORS error পেলে একজন ডেভেলপার হিসেবে তুমি কীভাবে debug করবে?
 ```
+
+---
+
+## 📚 পড়াশোনার পরামর্শ
+
+- প্রতিটা টপিক নিজে diagram এঁকে বোঝার চেষ্টা করো (বিশেষ করে TCP handshake, TLS handshake, OAuth flow)।
+- Wireshark দিয়ে বাস্তব প্যাকেট ক্যাপচার করে TCP/HTTP দেখা প্র্যাকটিস করলে concept আরও পাকা হবে।
+- Browser DevTools এর Network Tab ব্যবহার করে real HTTP request/response, cookie, header — এগুলো নিজে দেখো।
 
 ---
 
