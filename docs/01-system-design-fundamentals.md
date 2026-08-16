@@ -21,14 +21,61 @@
 | Traffic management | API gateway, reverse proxy, L4/L7 load balancing, health checks | Know where routing, policy, and health decisions belong |
 | Resilience | Rate limiting, circuit breaker, bulkhead, retry, timeout, backpressure | Bound work and prevent cascading failure |
 
+## বাংলা deep-learning prompt
+
+একবারে একটি topic বসিয়ে prompt-টি কপি করুন: `CAP Theorem`, `ACID vs BASE`, `Consistency Models`, `Availability`, `Partition Tolerance`, `Latency vs Throughput`, `Horizontal vs Vertical Scaling`, `Stateless vs Stateful Services`, `Monolith vs Microservices`, `Client–Server Architecture`, `API Gateway`, `Reverse Proxy`, `L4/L7 Load Balancer`, `Health Checks`, `Rate Limiting`, `Circuit Breaker`, `Bulkhead Pattern`, `Retry and Timeout`, `Idempotency`, `Backpressure`।
+
+```text
+আমি Senior Software Engineer/Staff Engineer/System Design interview-এর জন্য [TOPIC] শিখছি। আমাকে topic-টি basic থেকে advanced পর্যন্ত পরিষ্কার বাংলায় গভীরভাবে শেখান। Technical term-এর English নাম পাশে রাখবেন।
+
+উত্তরটি এই structure-এ দিন:
+1. সহজ সংজ্ঞা ও intuitive mental model
+2. কেন প্রয়োজন এবং কখন ব্যবহার করা হয়
+3. এটি কীভাবে কাজ করে—step-by-step flow
+4. একটি সহজ example এবং একটি production/real-life example
+5. গুরুত্বপূর্ণ variants, components ও implementation details
+6. alternatives-এর সঙ্গে comparison table
+7. trade-offs, limitations, bottlenecks, edge cases ও failure modes
+8. scale, reliability, consistency, security ও observability impact
+9. Senior/Staff-level interview-এ কীভাবে explain করব
+10. common mistakes এবং follow-up questions
+11. 5টি basic, 5টি intermediate ও 5টি advanced practice question আলাদা copyable code block-এ দিন
+12. practice questions-এর concise answer key শেষে আলাদা section-এ দিন, যাতে আগে self-test করতে পারি
+
+Topic: [TOPIC]
+Context: System Design Fundamentals
+```
+
+## Study path
+
+1. Write functional and non-functional requirements for a familiar product.
+2. Compare strong, eventual, read-your-writes, and monotonic-read consistency.
+3. Trace one request through DNS, gateway/proxy, load balancer, service, cache, and database.
+4. Create a failure table for slow dependencies, overload, partial failure, and duplicate requests.
+5. Explain why retries require deadlines, backoff, jitter, attempt limits, and idempotency.
+
+## Exercise
+
+Design the front door for a ticket-sale API that receives a 100× traffic spike. Include L4/L7 routing, health checks, per-user rate limits, timeouts, retry policy, circuit breaking, bulkheads, backpressure, and an idempotent purchase endpoint.
+
+## After-study checkpoint
+
+1. Why does CAP apply specifically when a network partition occurs?
+2. When would vertical scaling be the best first move?
+3. What is the difference between a reverse proxy, API gateway, and load balancer?
+4. How can retries amplify an outage?
+5. What state must an idempotency implementation persist, and for how long?
+
+**Complete when:** you can defend the ticket API under overload and explain every resilience control’s boundary.
+
 ---
 
-# 📚 System Design Fundamentals: Basic to Advanced Masterclass (বাংলায়)
+# 📚 Deep Learning Study Guide: System Design Fundamentals (বাংলায়)
 
-এই মডিউলে System Design-এর ২০টি ফাউন্ডেশনাল টপিককে বেসিক থেকে অ্যাডভান্সড (Senior/Staff Engineer ইন্টারভিউ লেভেল) পর্যন্ত বিস্তারিতভাবে সাজানো হয়েছে।
+এই সেকশনে মডিউল ০১-এর সবকটি (২০টি) টপিককে বেসিক থেকে অ্যাডভান্সড (Senior/Staff Engineer ইন্টারভিউ লেভেল) পর্যন্ত সংক্ষেপে ও গভীরভাবে সাজানো হয়েছে।
 
 ```
-System Design Fundamentals
+System Design Fundamentals Guide
 ├── ১. Distributed Trade-offs & Theory (CAP, Availability, Partition Tolerance, Consistency Models)
 ├── ২. Data Semantics & Transaction Models (ACID vs BASE, Idempotency)
 ├── ৩. Capacity, Scaling & Performance (Latency vs Throughput, Horizontal vs Vertical Scaling)
@@ -45,8 +92,8 @@ System Design Fundamentals
 
 ### ১. CAP Theorem
 
-#### সহজ সংজ্ঞা ও Intuitive Mental Model
-Eric Brewer-এর **CAP Theorem** বলে: একটি ডিস্ট্রিবিউটেড ডাটা স্টোরেজে নেটওয়ার্ক ফেইলিউর বা পার্টিশনের সময় আপনি একই সাথে **Consistency (C)** এবং **Availability (A)** দুটোই ১০০% গ্যারান্টি দিতে পারবেন না। যেকোনো একটি বেছে নিতে হবে।
+#### সহজ সংজ্ঞা ও Mental Model
+Eric Brewer-এর **CAP Theorem** অনুযায়ী, একটি ডিস্ট্রিবিউটেড ডাটা স্টোরেজে নেটওয়ার্ক ফেইলিউর বা পার্টিশনের সময় আপনি একই সাথে **Consistency (C)** এবং **Availability (A)** দুটোই ১০০% গ্যারান্টি দিতে পারবেন না। যেকোনো একটি বেছে নিতে হবে।
 - **Consistency (C):** প্রতিটি নোড থেকে রিড করলে সবসময় একদম লেটেস্ট রাইট করা ডাটা পাওয়া যাবে (Single source of truth)।
 - **Availability (A):** ক্লাস্টার বা সার্ভারের যেকোনো নন-ফেইলিং নোড সবসময় সাকসেসফুল রেসপন্স রিটার্ন করবে (এমনকি ডাটা পুরোনো হলেও সে এরর দেবে না)।
 - **Partition Tolerance (P):** নোডগুলোর মধ্যকার নেটওয়ার্কে প্যাকেট ড্রপ বা সংযোগ বিচ্ছিন্ন হলেও সিস্টেম ক্র্যাশ না করে চলবে।
@@ -399,27 +446,5 @@ Server Recovery ──> Clients retry distributed randomly over [0, 2.0s] ──
 </details>
 
 ---
-
-## Study path
-
-1. Write functional and non-functional requirements for a familiar product.
-2. Compare strong, eventual, read-your-writes, and monotonic-read consistency.
-3. Trace one request through DNS, gateway/proxy, load balancer, service, cache, and database.
-4. Create a failure table for slow dependencies, overload, partial failure, and duplicate requests.
-5. Explain why retries require deadlines, backoff, jitter, attempt limits, and idempotency.
-
-## Exercise
-
-Design the front door for a ticket-sale API that receives a 100× traffic spike. Include L4/L7 routing, health checks, per-user rate limits, timeouts, retry policy, circuit breaking, bulkheads, backpressure, and an idempotent purchase endpoint.
-
-## After-study checkpoint
-
-1. Why does CAP apply specifically when a network partition occurs?
-2. When would vertical scaling be the best first move?
-3. What is the difference between a reverse proxy, API gateway, and load balancer?
-4. How can retries amplify an outage?
-5. What state must an idempotency implementation persist, and for how long?
-
-**Complete when:** you can defend the ticket API under overload and explain every resilience control’s boundary.
 
 [← How to study](00-how-to-study.md) · [Roadmap](../ROADMAP.md) · [Networking →](02-networking.md)
