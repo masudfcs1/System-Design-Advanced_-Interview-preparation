@@ -447,4 +447,31 @@ Server Recovery ──> Clients retry distributed randomly over [0, 2.0s] ──
 
 ---
 
+## 📋 ২০টি টপিকের রিভিশন ও ইন্টারভিউ চেকলিস্ট
+
+| # | টপিক | বেসিক লেভেল (Fundamentals) | অ্যাডভান্সড লেভেল (Staff/Interview Level) | বাস্তব প্রোডাকশন উদাহরণ |
+|---|---|---|---|---|
+| **১** | **CAP Theorem** | C, A, P-এর সংজ্ঞা ও মানসিক মডেল | PACELC Theorem ($P \rightarrow A \text{ vs } C$, Else $L \text{ vs } C$) | Google Spanner (CP) বনাম DynamoDB (AP) |
+| **২** | **Availability** | আপটাইম ও ডাউনটাইম বেসিকস | 99.9% থেকে 99.999% ("Nines"), MTBF ও MTTR ম্যাথমেটিক্স | Netflix Active-Active Multi-Region |
+| **৩** | **Partition Tolerance** | নেটওয়ার্ক বিচ্ছিন্নতা কী | Split-Brain প্রতিরোধ ও Quorum Consensus ($\lfloor N/2 \rfloor + 1$) | Etcd / Raft Leader Election |
+| **৪** | **Consistency Models** | ডাটা আপডেটের সিঙ্ক্রোনাইজেশন | Linearizability, Eventual, Read-Your-Writes, Monotonic Reads | Facebook Comment / Twitter Feed Sync |
+| **৫** | **ACID vs BASE** | RDBMS বনাম NoSQL পার্থক্য | WAL (Write-Ahead Log), Isolation Levels, Soft State | PostgreSQL Transaction বনাম Cassandra Cluster |
+| **৬** | **Idempotency** | ডুপ্লিকেট কলের সেফটি | Distributed `SETNX` Lock, Request Fingerprinting | Stripe / bKash Payment API Flow |
+| **৭** | **Latency vs Throughput** | গাড়ির গতি বনাম লেনের ধারণক্ষমতা | Average বনাম p95/p99/p99.9 Tail Latency, Batching Trade-off | হাই-থ্রুপুট মেসেজিং সিস্টেম |
+| **৮** | **Horizontal vs Vertical Scaling** | সার্ভার আপগ্রেড বনাম ক্লাস্টার বড় করা | Single Point of Failure (SPOF), শার্ডিং ও ক্লাউড ইকোনমিক্স | AWS EC2 Auto-scaling Group |
+| **৯** | **Client-Server Architecture** | রিকোয়েস্ট-রেসপন্স মডেল | Separation of Concerns, Layered Architecture | REST/gRPC Client-Server Boundary |
+| **১০** | **Stateless vs Stateful Services** | মেমোরি স্টেট রাখার সুবিধা-অসুবিধা | JWT & Distributed Redis Session বনাম Consistent Hashing | Stateless API Pods বনাম WebSocket/Game Servers |
+| **১১** | **Monolith vs Microservices** | সিঙ্গেল অ্যাপ বনাম ডিস্ট্রিবিউটেড সার্ভিস | Fault Isolation, Network Latency Overhead, Domain Boundaries | Uber / Netflix আর্কিটেকচারাল ইভোলিউশন |
+| **১২** | **Reverse Proxy** | ক্লায়েন্ট ও সার্ভারের মধ্যবর্তী স্তর | SSL Termination, HTTP Compression, Security Masking | Nginx / HAProxy / Envoy Edge Proxy |
+| **১৩** | **Load Balancer (L4 vs L7)** | ট্রাফিক ভাগ করার ধারণা | Transport Layer (IP:Port) বনাম Application Layer (HTTP/Path/Cookie) | AWS ALB (L7) বনাম NLB (L4) |
+| **১৪** | **API Gateway** | সেন্ট্রাল গেটওয়ে কেন লাগে | Token Verification, Rate Limiting, Request Rewriting, Metrics | Kong / KrakenD / AWS API Gateway |
+| **১৫** | **Health Checks** | সার্ভার অন আছে কিনা দেখা | Liveness Probe বনাম Readiness Probe-এর পার্থক্য ও লাইফসাইকেল | Kubernetes Kubelet & ALB Target Group |
+| **১৬** | **Rate Limiting** | ট্রাফিক সীমিতকরণ কেন জরুরি | Token Bucket, Leaky Bucket, Sliding Window Counter অ্যালগরিদম | Redis ZSET Distributed Throttling |
+| **১৭** | **Circuit Breaker** | ফেইলিউর ক্যাসকেড হওয়া রোধ | Closed, Open, Half-Open স্টেট মেশিন, Fail-fast মেকানিজম | Netflix Hystrix / Resilience4j |
+| **১৮** | **Bulkhead Pattern** | রিসোর্স আইসোলেশনের ধারণা | ডেডিকেটেড থ্রেডপুল ও সেমাফোর আইসোলেশন | পেমেন্ট ও নোটিফিকেশন সার্ভিসের আলাদা থ্রেডপুল |
+| **১৯** | **Retry & Timeout** | নেটওয়ার্ক এররে রিট্রাই কৌশল | Exponential Backoff with Full Jitter, Thundering Herd প্রতিরোধ | AWS SDK Retry Client, gRPC Deadlines |
+| **২০** | **Backpressure** | প্রডিউসার ও কনজিউমার স্পিড ম্যাচিং | Reactive Streams (RxJava/Project Reactor), TCP Windowing | Apache Kafka Consumer Pull-Model |
+
+---
+
 [← How to study](00-how-to-study.md) · [Roadmap](../ROADMAP.md) · [Networking →](02-networking.md)
