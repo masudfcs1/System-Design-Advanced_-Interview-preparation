@@ -15,6 +15,33 @@ Use the [System Design Worksheet](../templates/system-design-template.md). For e
 6. Cover reliability, security, observability, and evolution.
 7. Record trade-offs and feedback in [PROGRESS.md](../PROGRESS.md).
 
+## বাংলা system-design practice prompt
+
+Problem catalog থেকে একটি system বসিয়ে prompt-টি কপি করুন—যেমন `URL Shortener`, `WhatsApp`, `Netflix`, `Uber`, `Payment Gateway`, `Google Drive`, `Search Engine`, অথবা `Distributed Job Scheduler`।
+
+```text
+আমি Senior/Staff Engineer System Design interview-এর জন্য [SYSTEM] design practice করছি। আমাকে সরাসরি final design দেবেন না। Interviewer-এর মতো এক ধাপ করে বাংলায় guide করুন এবং প্রতিটি ধাপে আমার উত্তর দেওয়ার জন্য অপেক্ষা করুন। Technical term English-এ রাখবেন।
+
+Interview flow:
+1. প্রথমে ambiguous requirements দিন এবং আমাকে clarifying questions করতে বলুন
+2. functional/non-functional requirements ও out-of-scope যাচাই করুন
+3. scale estimation (QPS, storage, bandwidth, peak traffic) করতে বলুন
+4. API, data model ও access pattern design করতে বলুন
+5. high-level architecture আঁকার জন্য Mermaid-compatible text flow চাইুন
+6. read path এবং write path deep dive করান
+7. database, cache, queue, partitioning ও consistency choices challenge করুন
+8. bottleneck, hot key, failure, retry, idempotency ও backpressure scenario দিন
+9. security, observability, disaster recovery ও cost নিয়ে follow-up করুন
+10. 10×/100× scale বা নতুন requirement দিয়ে design evolve করতে বলুন
+11. শেষে আমার উত্তরের strengths, gaps এবং 24-point scorecard দিন
+12. আরও practice-এর জন্য 10টি top follow-up interview question আলাদা copyable code block-এ দিন
+13. সবশেষে একটি concise reference design এবং key trade-offs দিন
+
+System: [SYSTEM]
+Interview level: Senior/Staff
+Time limit: 45 minutes
+```
+
 ## Problem catalog
 
 ### Level 1 · Core building blocks
@@ -99,4 +126,3 @@ Target **19/24 or higher twice in a row** before increasing problem difficulty.
 **Complete when:** you can lead a 45-minute design, adapt to changed requirements, and clearly defend trade-offs.
 
 [← Performance](19-performance-optimization.md) · [Roadmap](../ROADMAP.md) · [Advanced topics →](21-advanced-topics.md)
-

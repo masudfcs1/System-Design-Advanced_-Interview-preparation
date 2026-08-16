@@ -18,6 +18,31 @@
 | Execution | Lazy loading, async processing, parallel processing | Critical path, ordering, backpressure |
 | Runtime | Memory optimization | Allocation, caching, leaks, garbage collection |
 
+## বাংলা deep-learning prompt
+
+একবারে একটি topic বসিয়ে prompt-টি কপি করুন: `Connection Pooling`, `Thread Pool`, `Compression`, `Lazy Loading`, `Pagination`, `Cursor Pagination`, `Prefetching`, `Async Processing`, `Parallel Processing`, `Memory Optimization`।
+
+```text
+আমি Senior Backend Engineer/System Design interview-এর জন্য [TOPIC] শিখছি। Topic-টি basic থেকে advanced পর্যন্ত পরিষ্কার বাংলায় গভীরভাবে শেখান; English technical term পাশে রাখবেন।
+
+উত্তরটি এই structure-এ দিন:
+1. সহজ সংজ্ঞা, mental model ও কোন bottleneck target করে
+2. latency, throughput, utilization ও queueing-এর সঙ্গে সম্পর্ক
+3. execution/resource flow step-by-step
+4. একটি ছোট measured example এবং একটি production/real-life example
+5. sizing, limits, tuning ও benchmarking details
+6. relevant alternatives-এর comparison table
+7. trade-offs, contention, overload, memory/CPU cost ও failure modes
+8. backpressure, safety limits, observability ও rollback plan
+9. optimization-এর আগে/পরে কোন metrics verify করব
+10. Senior/Staff interview explanation, common mistakes ও follow-up questions
+11. 5টি basic, 5টি intermediate ও 5টি advanced practice question copyable code block-এ দিন
+12. concise answer key শেষে আলাদা section-এ দিন
+
+Topic: [TOPIC]
+Context: Performance Optimization
+```
+
 ## Study path
 
 1. Create a latency budget and measure percentiles, not only averages.
@@ -41,4 +66,3 @@ Reduce a feed API’s p99 latency from 2 seconds to 300 milliseconds. Propose me
 **Complete when:** each proposed change has a measured bottleneck, expected effect, safety limit, and verification method.
 
 [← Data engineering](18-data-engineering.md) · [Roadmap](../ROADMAP.md) · [Interview problems →](20-interview-problems.md)
-

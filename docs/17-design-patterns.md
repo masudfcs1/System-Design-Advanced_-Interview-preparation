@@ -20,6 +20,31 @@
 | Architecture | Hexagonal, Clean Architecture | Dependency direction and boundary isolation |
 | Domain | DDD | Bounded contexts, ubiquitous language, aggregates |
 
+## বাংলা deep-learning prompt
+
+একবারে একটি topic বসিয়ে prompt-টি কপি করুন: `Repository`, `Factory`, `Strategy`, `Observer`, `Singleton`, `Builder`, `Decorator`, `Adapter`, `Dependency Injection`, `Hexagonal Architecture`, `Clean Architecture`, `Domain-Driven Design (DDD)`।
+
+```text
+আমি Senior Software Engineer/interview preparation-এর জন্য [TOPIC] শিখছি। Topic-টি basic থেকে advanced পর্যন্ত পরিষ্কার বাংলায় গভীরভাবে শেখান; English technical term পাশে রাখবেন।
+
+উত্তরটি এই structure-এ দিন:
+1. সহজ সংজ্ঞা, intent ও যে design force/problem solve করে
+2. structure, participants এবং dependency direction
+3. code/request/domain flow step-by-step
+4. একটি ছোট code example এবং একটি production/real-life example
+5. implementation variants ও testing considerations
+6. related/competing patterns-এর comparison table
+7. trade-offs, overengineering, coupling ও misuse cases
+8. scalability, maintainability, team ownership ও evolution impact
+9. কখন pattern-টি ব্যবহার না করাই ভালো
+10. Senior/Staff interview explanation, common mistakes ও follow-up questions
+11. 5টি basic, 5টি intermediate ও 5টি advanced practice question copyable code block-এ দিন
+12. concise answer key শেষে আলাদা section-এ দিন
+
+Topic: [TOPIC]
+Context: Design Patterns and Software Architecture
+```
+
 ## Study path
 
 1. Identify the force each pattern addresses and the complexity it adds.
@@ -43,4 +68,3 @@ Design the core of a payment-routing service supporting multiple providers, rout
 **Complete when:** you can remove any pattern that lacks a concrete benefit and defend those that remain.
 
 [← Microservices](16-microservices.md) · [Roadmap](../ROADMAP.md) · [Data engineering →](18-data-engineering.md)
-

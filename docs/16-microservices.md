@@ -19,6 +19,31 @@
 | Workflows | Saga, CQRS | Distributed state and read models |
 | Operations | Distributed tracing | Context, dependency graphs, ownership |
 
+## বাংলা deep-learning prompt
+
+একবারে একটি topic বসিয়ে prompt-টি কপি করুন: `Service Discovery`, `API Gateway`, `Service Registry`, `Distributed Tracing`, `Inter-Service Communication`, `Database per Service`, `Shared Database`, `Saga`, `CQRS`, `Event-Driven Communication`।
+
+```text
+আমি Senior/Staff Engineer/System Design interview-এর জন্য [TOPIC] শিখছি। Topic-টি basic থেকে advanced পর্যন্ত পরিষ্কার বাংলায় গভীরভাবে শেখান; English technical term পাশে রাখবেন।
+
+উত্তরটি এই structure-এ দিন:
+1. সহজ সংজ্ঞা, mental model ও organizational/domain problem
+2. service boundary, ownership এবং coupling-এর উপর impact
+3. request/event/data flow step-by-step
+4. একটি ছোট example এবং একটি production/real-life example
+5. contracts, discovery, data ownership, migration ও versioning details
+6. modular monolith/relevant alternatives-এর comparison table
+7. latency, consistency, cascading failure ও operational complexity
+8. resilience, security, observability, deployment ও team ownership
+9. কখন microservice pattern-টি ব্যবহার করা উচিত নয়
+10. Senior/Staff interview explanation, common mistakes ও follow-up questions
+11. 5টি basic, 5টি intermediate ও 5টি advanced practice question copyable code block-এ দিন
+12. concise answer key শেষে আলাদা section-এ দিন
+
+Topic: [TOPIC]
+Context: Microservices Architecture
+```
+
 ## Study path
 
 1. Start with domain capabilities and ownership, not technical layers.
@@ -42,4 +67,3 @@ Split—or deliberately keep together—an e-commerce system covering catalog, c
 **Complete when:** every boundary has a business reason, owner, data model, contract, and failure strategy.
 
 [← Kubernetes](15-kubernetes.md) · [Roadmap](../ROADMAP.md) · [Design patterns →](17-design-patterns.md)
-

@@ -19,6 +19,31 @@
 | Capacity/storage | HPA, PersistentVolume | Metrics, requests/limits, state lifecycle |
 | Ecosystem | Helm, service mesh | Packaging, traffic policy, identity, telemetry |
 
+## বাংলা deep-learning prompt
+
+একবারে একটি topic বসিয়ে prompt-টি কপি করুন: `Pod`, `Deployment`, `ReplicaSet`, `StatefulSet`, `DaemonSet`, `Service`, `Ingress`, `ConfigMap`, `Secret`, `HPA`, `PersistentVolume`, `Namespace`, `Service Mesh`, `Helm`।
+
+```text
+আমি Senior Backend/Platform Engineer এবং System Design interview-এর জন্য [TOPIC] শিখছি। Topic-টি basic থেকে advanced পর্যন্ত পরিষ্কার বাংলায় গভীরভাবে শেখান; English technical term পাশে রাখবেন।
+
+উত্তরটি এই structure-এ দিন:
+1. সহজ সংজ্ঞা, mental model ও Kubernetes-এ এর responsibility
+2. control plane, controller ও resource relationships
+3. create/reconcile/traffic/lifecycle flow step-by-step
+4. একটি minimal YAML example এবং একটি production/real-life example
+5. scheduling, probes, rollout, scaling, networking বা storage details
+6. relevant Kubernetes resources/alternatives-এর comparison table
+7. limits, misconfiguration, cascading failure ও troubleshooting scenarios
+8. reliability, security, observability, upgrades ও operational safeguards
+9. কখন resource/pattern-টি ব্যবহার করা উচিত নয়
+10. Senior/Staff interview explanation, common mistakes ও follow-up questions
+11. 5টি basic, 5টি intermediate ও 5টি advanced practice question copyable code block-এ দিন
+12. concise answer key শেষে আলাদা section-এ দিন
+
+Topic: [TOPIC]
+Context: Kubernetes
+```
+
 ## Study path
 
 1. Trace desired state through controller reconciliation to running Pods.
@@ -42,4 +67,3 @@ Deploy or diagram a web API, worker, and stateful dependency. Include configurat
 **Complete when:** you can explain scheduling, traffic, rollout, failure, and state behavior end to end.
 
 [← Cloud architecture](14-cloud-architecture.md) · [Roadmap](../ROADMAP.md) · [Microservices →](16-microservices.md)
-

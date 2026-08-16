@@ -20,6 +20,32 @@
 | Workflows/data | Temporal/Cadence, MVCC, CRDTs, CDC, vector databases, data mesh, streaming at scale | What state model and consistency boundary apply? |
 | Economics | FinOps / cloud cost optimization | What unit cost, ownership, and guardrails influence design? |
 
+## বাংলা deep-learning prompt
+
+একবারে একটি topic বসিয়ে prompt-টি কপি করুন: `Multi-Tenant Architecture`, `Multi-Region Active-Active`, `Active-Passive Failover`, `Zero-Downtime Deployment`, `Blue-Green Deployment`, `Canary Deployment`, `Feature Flags`, `Service Mesh`, `Distributed Scheduling`, `Workflow Engines`, `MVCC`, `CRDTs`, `Vector Databases`, `Change Data Capture`, `Data Mesh`, `Event Streaming at Scale`, `Distributed Rate Limiting`, `Global Cache Invalidation`, `Multi-Leader Replication`, `Cross-Region Replication`, `Edge Computing`, `Serverless Architecture`, `FinOps`।
+
+```text
+আমি Staff/Principal Engineer এবং advanced System Design interview-এর জন্য [TOPIC] শিখছি। Topic-টি basic foundation থেকে expert depth পর্যন্ত পরিষ্কার বাংলায় শেখান; English technical term পাশে রাখবেন।
+
+উত্তরটি এই structure-এ দিন:
+1. সহজ সংজ্ঞা, mental model ও organization-scale problem
+2. prerequisites, invariants, assumptions এবং guarantees
+3. control/data/workflow architecture step-by-step
+4. একটি ছোট example এবং একটি global production/real-life example
+5. algorithms, protocols, migration ও operational details
+6. competing architectures-এর comparison/decision table
+7. consistency, availability, isolation, cost, limitations ও failure modes
+8. security, compliance, observability, recovery ও team ownership
+9. phased adoption/migration plan, compatibility ও rollback
+10. business impact, unit economics এবং decision revisit triggers
+11. Staff/Principal interview explanation, common mistakes ও adversarial follow-ups
+12. 5টি basic, 5টি intermediate ও 5টি expert practice question copyable code block-এ দিন
+13. concise answer key শেষে আলাদা section-এ দিন
+
+Topic: [TOPIC]
+Context: Staff and Principal-Level Architecture
+```
+
 ## Study path
 
 1. Design tenant isolation tiers: shared, partitioned, and dedicated.

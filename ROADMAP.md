@@ -36,7 +36,7 @@ Expect 5–7 focused hours per week.
 
 ## Weekly study loop
 
-1. **Learn** — read and create short notes in your own words.
+1. **Learn** — use the module's বাংলা deep-learning prompt for one topic at a time, then write short notes in your own words.
 2. **Compare** — make a trade-off table for competing approaches.
 3. **Apply** — complete the module exercise using the design template.
 4. **Defend** — explain the design aloud in 10–15 minutes.
@@ -57,4 +57,3 @@ Revisit completed modules after 1 day, 1 week, 1 month, and before an interview.
 | Adversarial | 45 min | Ask a partner to change scale and requirements |
 
 Move forward when two consecutive attempts cover requirements, estimates, APIs/data, architecture, bottlenecks, reliability, and trade-offs.
-
