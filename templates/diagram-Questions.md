@@ -113,12 +113,30 @@ graph TB
     style CACHE fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Hash function vs counter-based ID generation
-- Read-heavy workload optimization
-- Cache eviction policies (LRU)
-- 301 vs 302 redirects
-- Analytics and click tracking
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — User Request:** The user sends either a `POST /shorten` request (to create a short URL) or a `GET /:shortCode` request (to be redirected to the original URL). All requests hit the API Gateway first.
+
+**Step 2 — API Gateway (Rate Limiting):** The gateway enforces rate limits (e.g., 100 requests/min per user) to prevent abuse. It authenticates the request and forwards it to the URL Shortener Service.
+
+**Step 3 — URL Validator:** For creation requests, the URL Validator checks that the long URL is valid — proper format, reachable domain, not on a blocklist (malware/phishing).
+
+**Step 4 — Base62 Encoder:** The service generates a unique short code. Two approaches:
+- **Counter-based:** An auto-incrementing ID is converted to a Base62 string (a-z, A-Z, 0-9). A 7-character code gives ~3.5 trillion combinations.
+- **Hash-based:** MD5/SHA-256 hash of the URL, taking the first 7 characters. Collisions must be handled with retry logic.
+
+**Step 5 — Cache (Hot URLs):** For read requests (`GET /:shortCode`), the service first checks the in-memory cache (Redis/Memcached). Since URL shorteners are extremely read-heavy (~100:1 read-to-write ratio), caching the most frequently accessed URLs dramatically reduces database load. Uses LRU (Least Recently Used) eviction when the cache is full.
+
+**Step 6 — Database (URL Mappings):** On cache miss, the service queries the database (e.g., DynamoDB, PostgreSQL). The mapping `shortCode → longURL` is stored. For writes, both the database and cache are updated. The database also stores metadata like creation timestamp, expiration date, and the creator's user ID.
+
+**Step 7 — Redirect Response:** The service responds with a redirect:
+- **301 (Permanent Redirect):** Browser caches the redirect — subsequent visits bypass the server entirely. Better for performance but you lose analytics.
+- **302 (Temporary Redirect):** Browser always checks with the server first. Enables click tracking and analytics but adds latency.
+
+**🎯 Key Trade-offs:**
+- **Read-heavy optimization:** With a 100:1 ratio, cache hit rate is critical. Use Redis with LRU eviction.
+- **Analytics pipeline:** Log every redirect to a message queue for async processing — clicks per day, geographic distribution, referrer tracking.
+- **URL expiration:** Add TTL (Time to Live) to entries and run periodic cleanup jobs to remove expired URLs.
 
 ---
 
@@ -170,12 +188,26 @@ graph TB
     style MQ fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- WebSocket vs Long Polling vs SSE
-- Message ordering and delivery guarantees
-- Online/offline status tracking
-- Group chat vs 1:1 messaging
-- Message persistence and history
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — User Connection:** User A and User B both establish persistent WebSocket connections through the Load Balancer. Unlike HTTP (request-response), WebSocket maintains a full-duplex, long-lived connection enabling real-time bidirectional communication.
+
+**Step 2 — Load Balancer:** Distributes incoming WebSocket connections across multiple WebSocket Server instances. Uses sticky sessions (session affinity) so a user's connection stays on the same server.
+
+**Step 3 — WebSocket Server:** Manages the persistent connections. When User A sends a message to User B, the WebSocket Server receives it and forwards it to the Message Service. The server maintains a mapping of `userId → connectionId`.
+
+**Step 4 — Message Service:** Validates the message (size limits, content filtering), assigns a unique message ID and timestamp for ordering, then persists it to the Message Store. Messages are stored chronologically per conversation.
+
+**Step 5 — Message Queue:** The message is published to a queue (e.g., RabbitMQ, Kafka). This decouples message processing from delivery — if User B is on a different WebSocket server, the queue routes it to the correct server. Also handles retry logic for failed deliveries.
+
+**Step 6 — Presence Service:** Tracks which users are online/offline/typing. User heartbeats (sent every ~30 seconds) update the User Store. When a user disconnects, a grace period (e.g., 30s) prevents flapping between online/offline states.
+
+**Step 7 — Notification Service:** If User B is offline, the Notification Service sends a push notification (APNs for iOS, FCM for Android). Messages are queued for offline users and delivered when they reconnect.
+
+**🎯 Key Trade-offs:**
+- **WebSocket vs Long Polling vs SSE:** WebSocket is best for chat (bidirectional, low latency). Long Polling is a fallback for firewalled environments. SSE is server-to-client only.
+- **Message ordering:** Use server-assigned timestamps + sequence numbers per conversation. Lamport clocks for distributed ordering.
+- **Group chat:** Fan-out to all group members via the message queue. Limit group sizes to control fan-out cost.
 
 ---
 
@@ -224,12 +256,29 @@ graph TB
     style MDB fill:#E74C3C,stroke:#C0392B,color:#fff
 ```
 
-**Key Discussion Points:**
-- File chunking for large files
-- Deduplication strategies
-- Access control and permissions
-- Versioning and conflict resolution
-- Upload resumability
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — User & App:** The user interacts through a desktop or mobile application. The app handles local file operations, change detection, and communicates with the backend via REST/gRPC APIs.
+
+**Step 2 — API Gateway:** All requests pass through the gateway which handles SSL termination, request routing, and rate limiting. It ensures only authenticated users can access the system.
+
+**Step 3 — Auth Service:** Validates user credentials and authorization. Checks if the user has permission to upload/download/share the requested file. Uses JWT tokens for stateless authentication.
+
+**Step 4 — File Service:** The core orchestrator. For uploads: receives the file, coordinates chunking, and triggers metadata creation. For downloads: retrieves metadata, assembles chunks, and streams the file back to the user.
+
+**Step 5 — Chunking Service:** Splits large files into fixed-size chunks (e.g., 4MB each). Each chunk is hashed (SHA-256) to create a unique identifier. This enables:
+- **Deduplication:** If the same chunk already exists (same hash), skip uploading it. Saves storage dramatically for similar files.
+- **Resumable uploads:** If an upload fails, only the remaining chunks need to be re-uploaded.
+- **Parallel transfer:** Multiple chunks can be uploaded/downloaded simultaneously.
+
+**Step 6 — Object Storage:** Chunks are stored in an object storage system (like S3, GCS). Each chunk is stored by its hash as the key. Object storage provides durability (11 9's) and horizontal scalability.
+
+**Step 7 — Metadata Service & DB:** Stores file metadata — filename, path, owner, permissions, chunk list (ordered hashes), version history, timestamps. The Metadata DB (PostgreSQL/DynamoDB) maps `fileId → [chunk1_hash, chunk2_hash, ...]`.
+
+**🎯 Key Trade-offs:**
+- **Chunking granularity:** Smaller chunks = better deduplication + faster resumability, but more metadata overhead. 4MB is a common sweet spot.
+- **Versioning:** Store full snapshots (expensive) vs delta-based versioning (complex but storage-efficient).
+- **Conflict resolution:** Last-write-wins (simple) vs manual merge (user-friendly). Dropbox uses a "conflicted copy" approach.
 
 ---
 
@@ -286,12 +335,32 @@ graph TB
     style BLOB fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Fan-out on write vs fan-out on read
-- News feed generation algorithm
-- Follower/following graph storage
-- Media upload and CDN
-- Privacy and content moderation
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — User Request:** The user accesses the platform — creating posts, following others, liking content, or scrolling their feed. All requests pass through the Load Balancer.
+
+**Step 2 — Load Balancer → API Server:** The Load Balancer (e.g., Nginx, HAProxy) distributes traffic using round-robin or least-connections algorithm. The API Server routes requests to the appropriate microservice.
+
+**Step 3 — User Service → User DB:** Manages user profiles, authentication, and settings. Stores user data (name, email, bio, profile picture URL) in the User DB. Handles registration, login, and profile updates.
+
+**Step 4 — Post Service → Post DB & Media Storage:** When a user creates a post:
+1. Text content is stored in the Post DB (PostgreSQL/MySQL)
+2. Media (images, videos) is uploaded to Media Storage (object storage like S3)
+3. The Post DB stores the media URL, not the media itself
+4. Post Service triggers the Notification Service to alert tagged users
+
+**Step 5 — Feed Service → Feed Cache & Graph DB:** The most complex component. Two strategies:
+- **Fan-out on write (push model):** When User A posts, the system immediately writes the post ID to the feed cache of every follower. Fast reads, expensive writes. Works for users with <10K followers.
+- **Fan-out on read (pull model):** When User B opens their feed, the system fetches posts from all users they follow and merges them. Slow reads, cheap writes. Better for celebrities with millions of followers.
+
+**Step 6 — Graph DB (Followers):** Stores the social graph — who follows whom. A graph database (Neo4j) or adjacency list in a relational DB. Queries like "mutual friends" and "suggested connections" are graph traversal problems.
+
+**Step 7 — Like/Comment Service → Post DB:** Handles engagement. Like counts use counters (not count queries) for performance. Comments are stored as a separate table linked to post IDs.
+
+**🎯 Key Trade-offs:**
+- **Hybrid fan-out:** Use push for regular users, pull for celebrities (>100K followers). This avoids writing to millions of caches.
+- **Feed ranking:** Chronological (simple) vs algorithmic (ML-based relevance scoring considering engagement, relationship, recency).
+- **Privacy:** Row-level security on posts. Private accounts require follow-request approval before feed inclusion.
 
 ---
 
@@ -350,12 +419,37 @@ graph TB
     style IS fill:#E74C3C,stroke:#C0392B,color:#fff
 ```
 
-**Key Discussion Points:**
-- Inverted index data structure
-- TF-IDF ranking algorithm
-- Crawl scheduling and politeness
-- Query auto-complete
-- Spell correction and synonyms
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — Search Query:** The user types a search query (e.g., "best restaurants near me"). The Query Parser receives the raw query string.
+
+**Step 2 — Query Parser → Spell Checker → Tokenizer:** The query goes through a processing pipeline:
+1. **Query Parser:** Extracts intent, identifies operators (AND, OR, quotes for exact match)
+2. **Spell Checker:** Uses edit distance (Levenshtein) and a dictionary to suggest corrections. "resturant" → "Did you mean: restaurant?"
+3. **Tokenizer:** Breaks the query into individual tokens, removes stop words ("the", "is", "near"), applies stemming ("restaurants" → "restaurant")
+
+**Step 3 — Inverted Index:** The core data structure of any search engine. Maps each word to a list of document IDs containing that word:
+```
+"restaurant" → [doc_12, doc_45, doc_89, doc_102, ...]
+"best"       → [doc_3, doc_12, doc_45, doc_200, ...]
+```
+The intersection of posting lists gives documents containing ALL query terms.
+
+**Step 4 — Ranking Engine (TF-IDF):** Not all matching documents are equally relevant. TF-IDF scores each document:
+- **TF (Term Frequency):** How often the term appears in the document. More occurrences = more relevant.
+- **IDF (Inverse Document Frequency):** How rare the term is across all documents. Rare terms are more informative.
+- Score = TF × IDF for each term, summed across query terms.
+
+**Step 5 — Result Cache:** Caches the top results for popular queries. Search engines observe that ~30% of queries are repeated. Cache invalidation triggers when the underlying index is updated.
+
+**Step 6 — Web Crawler (Indexing Pipeline):** Runs asynchronously in the background. Starts from seed URLs, follows links, and downloads web pages. Respects `robots.txt` and implements politeness delays (e.g., 1 request per domain per second).
+
+**Step 7 — HTML Parser → Index Builder:** The parser extracts meaningful text from HTML (ignoring scripts, styles). The Index Builder constructs the inverted index and stores it in the Index Store. Raw documents are stored in the Document Store for snippet generation.
+
+**🎯 Key Trade-offs:**
+- **Auto-complete:** Use a Trie data structure with popularity scores. Return top-K suggestions as the user types.
+- **Synonyms:** Expand queries — "car" also searches for "automobile", "vehicle". Use a synonym dictionary.
+- **Freshness vs quality:** Frequently crawl news sites (hourly), less frequently for static content (weekly).
 
 ---
 
@@ -409,12 +503,44 @@ graph TB
     style MQ fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Product catalog and search
-- Shopping cart (session vs persistent)
-- Payment processing flow
-- Inventory management and race conditions
-- Order state machine
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — Buyer Request:** The buyer browses products, adds items to cart, and places orders. All requests go through the Load Balancer → API Gateway.
+
+**Step 2 — Load Balancer → API Gateway:** The Load Balancer distributes traffic. The API Gateway handles authentication, request validation, and routes to the correct service.
+
+**Step 3 — Product Service → Product DB:** Manages the product catalog — titles, descriptions, prices, images, categories, reviews. The Product DB stores structured product data. For search, products are also indexed in Elasticsearch for full-text search with filters (price range, category, rating).
+
+**Step 4 — Cart Service → Product Cache:** Manages the shopping cart. Two approaches:
+- **Session-based cart:** Stored in the user's session/cookie. Lost when session expires. Simple but unreliable.
+- **Persistent cart:** Stored server-side in Redis or a database. Survives across devices and sessions. Preferred approach.
+The Product Cache (Redis) stores frequently accessed product data to avoid hitting the Product DB on every page load.
+
+**Step 5 — Order Service → Order DB:** When the buyer clicks "Place Order":
+1. Creates an order record with status `PENDING`
+2. Validates all items are still in stock (calls Inventory Service)
+3. Calculates totals (subtotal + tax + shipping)
+4. Initiates payment (calls Payment Service)
+5. Order state machine: `PENDING → PAYMENT_PROCESSING → CONFIRMED → SHIPPED → DELIVERED`
+
+**Step 6 — Payment Service:** Integrates with payment gateways (Stripe, PayPal). Handles:
+- Payment initiation and tokenization (never store raw card numbers)
+- 3D Secure authentication
+- Payment confirmation callbacks (webhooks)
+- Refund processing
+
+**Step 7 — Inventory Service:** Manages stock levels. Critical challenge — **race conditions:**
+- Two users buying the last item simultaneously
+- Solution: Use database-level locks or atomic decrement operations
+- `UPDATE inventory SET quantity = quantity - 1 WHERE product_id = X AND quantity > 0`
+- If affected rows = 0, the item is out of stock
+
+**Step 8 — Order Queue:** After order confirmation, events are published to a message queue for async processing — send confirmation email, update analytics, trigger warehouse picking, notify shipping partner.
+
+**🎯 Key Trade-offs:**
+- **Inventory reservation:** When a user adds to cart, temporarily reserve stock for 15 minutes (TTL). Release if not purchased.
+- **Eventual consistency:** Order confirmation email may arrive slightly after payment — this is acceptable.
+- **Flash sales:** Pre-warm caches, use queue-based ordering to prevent thundering herd on inventory.
 
 ---
 
@@ -469,12 +595,39 @@ graph TB
     style MQ fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Geospatial indexing (QuadTree, Geohash)
-- Real-time driver location tracking
-- Matching algorithm (nearest driver)
-- Surge pricing model
-- ETA calculation
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — Rider & Driver Requests:** Two types of users interact through the API Gateway:
+- **Rider:** Sends a "Request Ride" with pickup and dropoff locations
+- **Driver:** Continuously sends location updates (every 3-5 seconds via GPS)
+
+**Step 2 — API Gateway:** Routes rider requests to the Matching Service and driver location updates to the Location Service. Handles authentication and rate limiting.
+
+**Step 3 — Location Service → Geospatial Index:** Processes incoming driver locations and updates the Geospatial Index. The index uses a **QuadTree** or **Geohash** for efficient spatial queries:
+- **QuadTree:** Recursively divides the map into quadrants. Finding nearby drivers is O(log n) — traverse the tree to the rider's quadrant and check neighboring quadrants.
+- **Geohash:** Encodes latitude/longitude into a string (e.g., "9q8yyk"). Nearby locations share a common prefix. Simple range queries on the hash find neighbors.
+
+**Step 4 — Matching Service → Geospatial Index:** When a ride is requested:
+1. Query the Geospatial Index for all available drivers within a radius (e.g., 5km)
+2. Rank candidates by: distance, ETA, driver rating, acceptance rate
+3. Send the ride offer to the best-matched driver
+4. If declined (or timeout after 15s), offer to the next candidate
+5. Repeat until a driver accepts or all candidates are exhausted
+
+**Step 5 — Pricing Service:** Calculates the fare before the rider confirms:
+- **Base fare** + **per-km rate** + **per-minute rate** + **surge multiplier**
+- **Surge pricing:** When demand exceeds supply in an area, the multiplier increases (1.5x, 2x, 3x). This incentivizes more drivers to enter the high-demand zone.
+
+**Step 6 — Trip Service → Trip DB:** Once a driver accepts, a trip record is created with status `MATCHED`. The state machine: `REQUESTED → MATCHED → DRIVER_EN_ROUTE → ARRIVED → IN_PROGRESS → COMPLETED`
+
+**Step 7 — Payment Service:** After trip completion, charges the rider's payment method. Handles split payments, tips, and refunds.
+
+**Step 8 — Event Queue:** Publishes trip events for async processing — update driver earnings, send receipt email, log analytics for route optimization.
+
+**🎯 Key Trade-offs:**
+- **ETA calculation:** Use road network graph (not straight-line distance). Dijkstra's algorithm or ML models trained on historical trip data.
+- **Driver location freshness:** Stale locations cause bad matches. Set TTL on location data (30s) — if no update, mark driver as unavailable.
+- **Scalability:** Partition the geospatial index by geographic region (city-level sharding).
 
 ---
 
@@ -527,12 +680,33 @@ graph TB
     style MDB fill:#E74C3C,stroke:#C0392B,color:#fff
 ```
 
-**Key Discussion Points:**
-- Video transcoding (multiple resolutions)
-- Adaptive bitrate streaming (HLS/DASH)
-- CDN for low-latency delivery
-- Thumbnail generation
-- Video chunking and seek support
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — Creator Upload:** The content creator uploads a raw video file through the Load Balancer to the Video Service. Large files (often GB-sized) use chunked/resumable upload protocols (e.g., tus protocol) to handle network interruptions.
+
+**Step 2 — Raw Video Storage:** The Video Service stores the original, unprocessed video in raw storage (object storage like S3). This serves as the source of truth — never deleted, used for re-transcoding if needed.
+
+**Step 3 — Transcoding Pipeline:** The most compute-intensive step. The raw video is transcoded into multiple formats:
+- **Resolutions:** 240p, 360p, 480p, 720p, 1080p, 4K
+- **Codecs:** H.264 (compatibility), H.265/HEVC (better compression), VP9/AV1 (royalty-free)
+- **Bitrates:** Each resolution has multiple bitrate versions for different network speeds
+- A single 1-hour 4K video may produce 20+ output files. This runs on a distributed worker farm (FFmpeg-based).
+
+**Step 4 — Encoded Videos Storage:** All transcoded versions are stored in encoded video storage, organized by `videoId/resolution/segment`. Videos are split into small segments (2-10 seconds each) to enable adaptive streaming.
+
+**Step 5 — Metadata DB:** Stores video metadata — title, description, tags, upload timestamp, duration, thumbnail URLs, transcoding status, view count, and the manifest file location (list of all available quality levels).
+
+**Step 6 — CDN (Edge Servers):** When a viewer watches a video, it's served from the nearest CDN edge server (not the origin). Popular videos are cached at the edge. The CDN uses:
+- **Adaptive Bitrate Streaming (ABR):** The player monitors bandwidth and automatically switches between quality levels mid-stream
+- **HLS (HTTP Live Streaming):** Apple's protocol, widely supported
+- **DASH:** An open standard alternative
+
+**Step 7 — Search & Recommendation:** Viewers discover content through search (full-text on metadata) and recommendations (collaborative filtering based on watch history).
+
+**🎯 Key Trade-offs:**
+- **Transcoding cost vs quality:** More output formats = better user experience but exponentially higher storage and compute cost. Prioritize popular resolutions.
+- **Thumbnail generation:** Extract frames at regular intervals (every 10s) plus ML-selected "best" frame for the video thumbnail.
+- **Video chunking:** 2-second segments allow fast seeking and quality switching. Larger segments reduce HTTP overhead but increase initial buffering.
 
 ---
 
@@ -590,12 +764,34 @@ graph TB
     style CACHE fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Collaborative vs content-based filtering
-- Cold start problem
-- Feature engineering
-- A/B testing recommendations
-- Real-time vs batch recommendation
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — User Request:** The user opens the app/website. The API Server receives a request for personalized recommendations for this specific user.
+
+**Step 2 — Hybrid Ranker:** The recommendation engine uses a hybrid approach combining multiple strategies, then blends and ranks the final results:
+
+**Step 3 — Collaborative Filtering (CF) → User History:** "Users who liked what you liked, also liked these." CF finds patterns across users:
+- **User-User CF:** Find similar users (same viewing/purchase history), recommend what they liked
+- **Item-Item CF:** Find similar items (co-purchased, co-viewed), recommend related items
+- Works on the User History database containing past interactions (views, purchases, ratings)
+
+**Step 4 — Content-Based Filtering → Item Profiles:** "Based on the attributes of items you liked." Analyzes item features (genre, category, description) and matches them to user preferences:
+- If a user watches many sci-fi movies, recommend other sci-fi movies
+- Uses the Item Profiles database containing feature vectors for every item
+
+**Step 5 — Result Cache:** Pre-computed recommendations are cached per user. Cache TTL is typically 1-4 hours. Serves ~90% of requests without hitting the recommendation engine.
+
+**Step 6 — Event Logger → Feature Extractor (Data Pipeline):** Every user action (click, view, purchase, skip, dwell time) is logged. The Feature Extractor transforms raw events into ML features:
+- User features: age group, location, past purchase categories, average spend
+- Item features: category, price range, popularity score, recency
+- Interaction features: click-through rate, time spent, bounce rate
+
+**Step 7 — Model Trainer (Batch):** Periodically (daily/weekly) retrains the ML model on all accumulated data. The trained model is stored in the Model Store and used by the Collaborative Filtering engine for predictions.
+
+**🎯 Key Trade-offs:**
+- **Cold start problem:** New users have no history → show popularity-based recommendations. New items have no interactions → use content-based features until enough data accumulates.
+- **Real-time vs batch:** Batch provides higher quality (more data), real-time captures immediate intent (user just searched for shoes). Best systems combine both.
+- **A/B testing:** Run experiments comparing recommendation algorithms. Measure click-through rate, conversion rate, and engagement time. Statistically significant results determine which model to deploy.
 
 ---
 
@@ -655,12 +851,43 @@ graph TB
     style MQ fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Three-sided marketplace design
-- Real-time order tracking
-- Restaurant search and menu management
-- Delivery agent assignment algorithm
-- Order state machine
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — Three User Types:** The system serves three distinct users, each with different needs:
+- **Customer:** Browses restaurants, places orders, tracks delivery
+- **Restaurant:** Manages menu, accepts/rejects orders, updates preparation status
+- **Delivery Agent:** Goes online/offline, accepts delivery assignments, updates location
+
+**Step 2 — API Gateway:** Single entry point for all three user types. Routes requests to the appropriate service based on the endpoint and user role. Handles JWT authentication for each user type.
+
+**Step 3 — Restaurant Service → Restaurant DB:** Manages restaurant profiles — name, address, operating hours, cuisine type, rating, delivery radius. The Restaurant DB stores structured restaurant data. Search is powered by geospatial queries (find restaurants within 5km) combined with filters (cuisine, rating, price range).
+
+**Step 4 — Order Service → Order DB:** The core orchestrator. Order state machine:
+`PLACED → ACCEPTED (by restaurant) → PREPARING → READY_FOR_PICKUP → PICKED_UP (by delivery agent) → EN_ROUTE → DELIVERED`
+Each state transition triggers events (notifications, ETA updates).
+
+**Step 5 — Delivery Service → Geospatial Index:** Assigns delivery agents to orders:
+1. When an order is "READY_FOR_PICKUP", query nearby available agents using the Geospatial Index
+2. Rank by: proximity to restaurant, current load (already carrying orders?), acceptance rate
+3. Send assignment notification to the best agent
+4. If declined/timeout (30s), cascade to the next agent
+
+**Step 6 — Location Service → Geospatial Index:** Processes real-time location updates from delivery agents (every 5 seconds). Updates the Geospatial Index for matching and provides live tracking data to customers.
+
+**Step 7 — Payment Service:** Handles the complex payment split:
+- Customer pays: food cost + delivery fee + platform fee + taxes
+- Restaurant receives: food cost - platform commission (~20-30%)
+- Delivery agent receives: delivery fee + tips
+
+**Step 8 — Event Queue → Notification Service:** Order events are published to a message queue. The Notification Service sends real-time updates:
+- Push notifications (order accepted, agent assigned, arriving in 5 min)
+- SMS fallback for critical updates
+- In-app real-time tracking via WebSocket
+
+**🎯 Key Trade-offs:**
+- **Batching deliveries:** Assign multiple orders to one agent (from same area) to reduce cost but increase delivery time.
+- **ETA accuracy:** ML models trained on historical data (time of day, traffic, restaurant prep time). Update ETA in real-time as the agent moves.
+- **Peak load:** Lunch (12-2pm) and dinner (7-9pm) surges. Pre-scale infrastructure, increase delivery fees to incentivize more agents.
 
 ---
 
@@ -704,12 +931,41 @@ graph TB
     style DIS fill:#4A90D9,stroke:#2C5F8A,color:#fff
 ```
 
-**Key Discussion Points:**
-- OOP design (Vehicle, Spot, Ticket classes)
-- Spot allocation strategy (nearest, type-based)
-- Pricing model (hourly, daily, monthly)
-- Concurrency for spot allocation
-- Multi-floor and multi-entrance support
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — Vehicle Arrives at Entry Gate:** A vehicle arrives at the entry gate. Sensors detect the vehicle type (motorcycle, car, bus/truck). A camera reads the license plate via OCR (Optical Character Recognition).
+
+**Step 2 — Parking Manager:** The central controller receives the vehicle arrival event. It coordinates between the Spot Allocator, Ticket Service, and Payment Service. Implements the core business logic.
+
+**Step 3 — Spot Allocator → Parking DB:** Finds an available parking spot:
+1. Queries the DB for spots matching the vehicle type (compact, regular, large)
+2. **Allocation strategies:**
+   - **Nearest to entrance:** Minimizes walking distance for the customer
+   - **Nearest to elevator:** Preferred for multi-floor lots
+   - **Spread evenly:** Distributes vehicles across floors to reduce congestion
+3. Marks the spot as `OCCUPIED` in the database
+4. **Concurrency handling:** Uses optimistic locking — `UPDATE spots SET status='OCCUPIED', version=version+1 WHERE id=X AND status='AVAILABLE' AND version=Y`. If affected rows = 0, another vehicle took the spot; retry with a different spot.
+
+**Step 4 — Ticket Service → Entry Gate:** Generates a parking ticket containing:
+- Ticket ID (unique barcode/QR code)
+- Vehicle license plate
+- Assigned spot number (floor + spot)
+- Entry timestamp
+- Prints or displays the ticket at the gate, then raises the barrier.
+
+**Step 5 — Display Board:** The Spot Allocator updates the display board showing available spots per floor and per type. Real-time updates help drivers navigate to available areas.
+
+**Step 6 — Vehicle Leaves at Exit Gate:** The driver scans their ticket at the exit gate. The Parking Manager retrieves the ticket details.
+
+**Step 7 — Payment Service → Parking DB:** Calculates the parking fee:
+- **Pricing models:** Hourly rate, daily maximum cap, monthly subscription, free first 30 minutes
+- Fee = (exit_time - entry_time) × hourly_rate, capped at daily_max
+- Accepts payment (card, mobile, cash) and marks the spot as `AVAILABLE`
+
+**🎯 Key Trade-offs:**
+- **OOP design:** Model with classes: `Vehicle` (type, plate), `ParkingSpot` (floor, number, type, status), `Ticket` (id, entry_time, vehicle, spot), `ParkingLot` (floors, entrances, capacity)
+- **Multi-entrance:** Multiple entry/exit gates require distributed locking to prevent double-assigning the same spot.
+- **Reservation system:** Allow users to pre-book a spot — mark it as `RESERVED` with TTL. If the vehicle doesn't arrive within 15 minutes, release it.
 
 ---
 
@@ -761,12 +1017,42 @@ graph TB
     style CACHE fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Audio encoding formats (MP3, AAC, FLAC)
-- Streaming protocols (HTTP progressive, HLS)
-- Playlist CRUD operations
-- Offline download support
-- Royalty tracking per play
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — Listener Request:** The user opens the music app and interacts with various services — playing songs, searching for music, managing playlists, or browsing their library.
+
+**Step 2 — Playback Service → CDN → Audio Storage:** When the user hits play:
+1. The Playback Service determines the audio file URL and streaming quality based on user's subscription tier and network speed
+2. The CDN serves the audio file from the nearest edge server. Popular songs (top 1% = ~80% of plays) are almost always cached.
+3. Audio is streamed progressively — playback starts before the full file downloads
+4. **Formats:** MP3 (128/320kbps for compatibility), AAC (better quality at same bitrate), FLAC (lossless for premium users)
+
+**Step 3 — Search Service → Metadata DB:** Full-text search across songs, artists, albums, and playlists. The Metadata DB stores:
+- Song: title, artist, album, duration, genre, release year, lyrics
+- Artist: name, bio, discography, follower count
+- Album: title, track list, artwork URL, release date
+Search uses Elasticsearch for fuzzy matching ("beatles" matches "The Beatles") and autocomplete.
+
+**Step 4 — Playlist Service → Playlist Cache & Metadata DB:** Manages playlist CRUD:
+- **Create:** New playlist with name, description, cover image
+- **Add/Remove:** Add or remove songs (order matters)
+- **Collaborative:** Multiple users can edit the same playlist
+- Playlists are cached in Redis for fast retrieval. Hot playlists (editorial, trending) are pre-warmed in cache.
+
+**Step 5 — Library Service → User Preferences:** Manages the user's personal library — liked songs, followed artists, saved albums, recently played. User Preferences also stores:
+- Listening history (for recommendations)
+- Audio quality preferences
+- Offline download list
+
+**Step 6 — Recommendation Service:** Analyzes User Preferences and Metadata to generate personalized suggestions:
+- "Discover Weekly" — collaborative filtering on listening patterns
+- "Radio" — seed song + audio feature similarity (tempo, key, energy)
+- Uses both user preferences and song metadata (genre, mood, tempo) for hybrid recommendations.
+
+**🎯 Key Trade-offs:**
+- **Offline downloads:** Encrypt downloaded files with user-specific keys. Files are DRM-protected and expire if subscription lapses.
+- **Royalty tracking:** Every play event is logged with song ID, duration played (must play >30 seconds to count), and user region. Aggregated and reported to rights holders for royalty payments.
+- **Streaming vs download:** Stream by default to save storage. Pre-buffer the next song in a playlist for gapless playback.
 
 ---
 
@@ -817,12 +1103,37 @@ graph TB
     style MQ fill:#E67E22,stroke:#D35400,color:#fff
 ```
 
-**Key Discussion Points:**
-- Seat locking (pessimistic vs optimistic)
-- Double booking prevention
-- Temporary reservation with TTL
-- Payment timeout handling
-- Waitlist and cancellation flow
+**📖 Step-by-Step Diagram Walkthrough:**
+
+**Step 1 — User Browses Events:** The user searches for events (concerts, movies, flights). The API Gateway routes the request to the Event Service.
+
+**Step 2 — Event Service → Event DB:** Returns event details — date, venue, available categories, pricing tiers. The Event DB stores the event catalog with seat maps (for assigned seating) or capacity counts (for general admission).
+
+**Step 3 — Booking Service → Seat Selection:** The user selects specific seats. This is the most critical step — preventing double booking:
+
+**Step 4 — Seat Selection → Distributed Lock (Seat Reservation):** Two locking strategies:
+- **Pessimistic Locking:** When a user selects a seat, immediately lock it in the database using `SELECT ... FOR UPDATE`. No other user can select it. Simple but holds database connections.
+- **Optimistic Locking:** Allow multiple users to select the same seat. At booking time, use a version check: `UPDATE seats SET status='BOOKED', version=version+1 WHERE seat_id=X AND version=Y AND status='AVAILABLE'`. If affected rows = 0, another user booked it first.
+- **Temporary Reservation with TTL:** Best approach — when a user selects seats, create a temporary reservation (status = `HELD`) with a 10-minute TTL. If payment isn't completed within 10 minutes, the reservation expires and seats are released automatically.
+
+**Step 5 — Booking Service → Payment Service:** After seat selection, the user proceeds to payment:
+1. Create a booking record with status `PENDING_PAYMENT`
+2. Initiate payment via the Payment Service
+3. **Payment timeout:** If payment doesn't complete within the TTL (10 min), cancel the booking and release the seats
+4. If payment fails, mark booking as `PAYMENT_FAILED` and release seats
+
+**Step 6 — Confirmation Queue → Notification:** On successful payment:
+1. Update booking status to `CONFIRMED`
+2. Publish to the Confirmation Queue
+3. Notification Service sends:
+   - Email with e-ticket (PDF with QR code)
+   - SMS confirmation
+   - Push notification
+
+**🎯 Key Trade-offs:**
+- **High-demand events (concert tickets):** Use a queue-based system — users enter a virtual waiting room, assigned positions randomly or by arrival time. Process bookings sequentially from the queue.
+- **Waitlist:** If an event is sold out, allow users to join a waitlist. When a cancellation occurs, offer the ticket to the first waitlisted user (with a time-limited hold).
+- **Idempotency:** Payment callbacks may be received multiple times. Use idempotency keys to prevent charging twice.
 
 ---
 
