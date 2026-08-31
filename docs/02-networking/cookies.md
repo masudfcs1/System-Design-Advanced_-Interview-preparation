@@ -1,41 +1,177 @@
-# Cookies
+# HTTP Cookies & Browser State
 
-[Back to Networking topics](README.md) | [Module guide](../02-networking.md)
+[Back to Networking topics](README.md) · [Module guide](../02-networking.md)
 
-## Learning checklist
+## 📌 Learning Checklist
+- [ ] Understand HTTP Cookies (RFC 6265) and how they turn stateless HTTP into stateful web sessions.
+- [ ] Master Cookie Security Directives: `HttpOnly`, `Secure`, `SameSite` (Strict, Lax, None), `Domain`, and `Path`.
+- [ ] Grasp Cross-Site Scripting (XSS) mitigation via `HttpOnly`.
+- [ ] Master Cross-Site Request Forgery (CSRF) mechanics and defenses (`SameSite` + Anti-CSRF Tokens).
+- [ ] Contrast First-Party vs Third-Party Cookies and the modern privacy landscape (Tracking Cookie phase-out).
+- [ ] Defend enterprise session cookie architectures in Staff-level security interviews.
 
-- [ ] Explain Cookies in your own words.
-- [ ] Identify when it is useful and when it is a poor fit.
-- [ ] Compare its main alternatives and trade-offs.
-- [ ] Describe one failure mode and a mitigation.
-- [ ] Apply it to a realistic system-design scenario.
+---
 
-## Notes
+## 📖 Deep Dive Notes
 
-### Core idea
+### 1. সহজ সংজ্ঞা ও Intuitive Mental Model
 
-Write the definition, purpose, and operating model here.
+১৯৯৪ সালে নেটস্কেপের ইঞ্জিনিয়ার Lou Montulli কর্তৃক উদ্ভাবিত **HTTP Cookie** হলো একটি ক্ষুদ্র টেক্সট ডেটা (সর্বোচ্চ ৪ কিলোবাইট) যা একটি ওয়েব সার্ভার ব্রাউজারে সংরক্ষণ করার জন্য পাঠায় এবং পরবর্তীতে ব্রাউজার প্রতিটি সম্পর্কিত আউটগোয়িং রিকোয়েস্টের সাথে সেই ডেটা স্বয়ংক্রিয়ভাবে সার্ভারে ফেরত পাঠায়।
 
-### Trade-offs
+HTTP স্বভাবগতভাবেই একটি স্ট্যাটলেস (Stateless) প্রোটোকল। কুকি হলো সেই জাদুকরী মেকানিজম যা এই স্ট্যাটলেস প্রোটোকলকে স্ট্যাটফুল ওয়েব সেশনে (যেমন: লগইন ধরে রাখা, শপিং কার্ট মনে রাখা) রূপান্তর করে।
 
-| Best when | Benefits | Costs and risks | Alternatives |
-|---|---|---|---|
-| | | | |
+```
+[ Browser ] ─── (1) POST /login (user, pass) ─────────► [ Web Server ]
+[ Browser ] ◄── (2) 200 OK + Set-Cookie: session_id=xyz ─ [ Web Server ]
+   │ (Browser stores session_id locally)
+   │
+   │ ─── (3) GET /dashboard (Cookie: session_id=xyz) ──► [ Web Server ]
+[ Browser ] ◄── (4) 200 OK (Welcome Rahim!) ─────────── [ Web Server ]
+```
 
-### Failure modes
+> 🧠 **Intuitive Mental Model (বিনোদন পার্কের হাতের সিলমোহর অ্যানালজি):**
+> আপনি একটি থিম পার্কে টিকিট কেটে প্রবেশ করলেন। 
+> প্রতিবার কোনো রাইডে ওঠার সময় পার্ক কর্তৃপক্ষ আপনার পুরো পাসপোর্ট বা ক্রেডিট কার্ড দেখতে চায় না। কাউন্টারে প্রথমবার টিকিট কাটার সময় তারা আপনার হাতের ওপর একটি বিশেষ অদৃশ্য কালির রাবার সিল মেরে দিল (**Set-Cookie: session_id**)। 
+> এরপর আপনি পার্কের রোলার কোস্টার, ফেরিস হুইল বা ভূতের বাড়িতে যান—রাইডের সিকিউরিটি গার্ড শুধু আল্ট্রাভায়োলেট আলো দিয়ে আপনার হাতের সিলটি দেখে নেয় (**Automatic Cookie Header Injection**) এবং আপনাকে প্রবেশ করতে দেয়!
 
-- Failure:
-- Detection:
-- Mitigation:
+---
 
-## Design questions
+### 2. Cookie Security Attributes (নিরাপত্তা অ্যাট্রিবিউটসমূহ)
 
-1. What requirement makes Cookies relevant?
-2. What changes at 10x traffic or data volume?
-3. What should be measured in production?
-4. What decision would make you replace this approach?
+একটি সাধারণ কুকি সেট করা এবং একটি এন্টারপ্রাইজ সিকিউর কুকি সেট করার মধ্যে আকাশ-পাতাল পার্থক্য:
 
-## Practice
+```http
+Set-Cookie: sid=s%3A7b2c9a1d; Max-Age=86400; Domain=example.com; Path=/; Secure; HttpOnly; SameSite=Lax
+```
 
-Apply this topic to the exercise in the [Module 02 guide](../02-networking.md), then record the decision and its trade-offs.
+| অ্যাট্রিবিউট | কাজ ও গুরুত্ব | অনুপস্থিত থাকলে নিরাপত্তা ঝুঁকি |
+|---|---|---|
+| **`HttpOnly`** | ব্রাউজারের কোনো জাভাস্ক্রিপ্ট কোড (`document.cookie`) এই কুকিটি পড়তে বা স্পর্শ করতে পারে না। এটি শুধুমাত্র ব্রাউজারের নেটওয়ার্ক ইঞ্জিন সার্ভারে পাঠাতে পারে। | **XSS Vulnerability:** ওয়েবসাইটে কোনো ম্যালিসিয়াস স্ক্রিপ্ট ঢুকলে নিমেষেই ইউজার সেশন চুরি হয়ে যায়। |
+| **`Secure`** | ব্রাউজার কুকিটি শুধুমাত্র এবং শুধুমাত্র এনক্রিপ্টেড **HTTPS** কানেকশনে পাঠাবে। সাধারণ প্লেইন HTTP-তে এটি কখনো ওয়্যারে যাবে না। | **Packet Sniffing:** ক্যাফে বা পাবলিক ওয়াইফাইতে আন-এনক্রিপ্টেড সংযোগে সেশন হাইজ্যাক হয়। |
+| **`SameSite`** | থার্ড-পার্টি সাইট থেকে শুরু হওয়া ক্রস-সাইট রিকোয়েস্টে এই কুকিটি ব্রাউজার সাথে পাঠাবে কি পাঠাবে না তা কঠোরভাবে নিয়ন্ত্রণ করে। | **CSRF Vulnerability:** ক্ষতিকর সাইটে ক্লিক করলেই গোপনে ইউজারের ব্যাংক থেকে টাকা ট্রান্সফার হয়ে যায়। |
+| **`Domain & Path`** | কুকিটির স্কোপ নির্দিষ্ট করে (যেমন: `Domain=api.com; Path=/v1`)। | অপ্রয়োজনীয় সাবডোমেন বা পাথে গোপন কুকি লিক হয়ে যায়। |
 
+---
+
+### 3. Deep Dive: `SameSite` (Strict বনাম Lax বনাম None)
+
+```
+[ SameSite=Strict ]
+- কোনো অবস্থাতেই ক্রস-সাইট রিকোয়েস্টে কুকি পাঠানো হবে না।
+- ইউজার অন্য সাইটে (যেমন জিমেইল বা ফেসবুক) কোনো লিঙ্কে ক্লিক করে এই সাইটে আসলেও শুরুতে লগইন দেখাবে না! (চরম কঠোর)।
+
+[ SameSite=Lax (আধুনিক ব্রাউজার ডিফল্ট) ]
+- সাধারণ ক্রস-সাইট POST/AJAX রিকোয়েস্টে কুকি যাবে না (CSRF বন্ধ!)।
+- কিন্তু ইউজার কোনো বাহ্যিক লিঙ্কে ক্লিক করে স্বাভাবিক নেভিগেশনের মাধ্যমে এলে (Top-level GET Navigation) কুকি যাবে (ইউজার ফ্রেন্ডলি)।
+
+[ SameSite=None ]
+- যেকোনো ক্রস-সাইট রিকোয়েস্টেই কুকি পাঠানো হবে (iframe বা থার্ড-পার্টি উইজেট)।
+- এটি ব্যবহার করতে হলে অবশ্যই সাথে `Secure` ফ্ল্যাগ থাকা বাধ্যতামূলক (`SameSite=None; Secure`)।
+```
+
+---
+
+### 4. XSS বনাম CSRF: কুকি কীভাবে উভয় আক্রমণের কেন্দ্রে থাকে?
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       ATTACK COMPARISON                     │
+├──────────────────────────────┬──────────────────────────────┤
+│ Cross-Site Scripting (XSS)   │ Cross-Site Request Forgery   │
+│                              │ (CSRF)                       │
+├──────────────────────────────┼──────────────────────────────┤
+│ আক্রমণকারী আপনার সাইটের      │ আক্রমণকারী অন্য একটি ক্ষতিকর │
+│ ভেতরে ক্ষতিকর জাভাস্ক্রিপ্ট   │ সাইট (evil.com) তৈরি করে     │
+│ ইনজেক্ট করে।                 │ ভিকটিমকে প্রলুব্ধ করে।      │
+│                              │                              │
+│ লক্ষ্য: কুকি চুরি করা।       │ লক্ষ্য: কুকি চুরি না করেই     │
+│                              │ ব্রাউজারের অটো-কুকি পাঠানোর  │
+│                              │ ক্ষমতার অপব্যবহার করা।        │
+│                              │                              │
+│ প্রধান প্রতিরক্ষা:          │ প্রধান প্রতিরক্ষা:          │
+│ • `HttpOnly` Cookie Flag     │ • `SameSite=Lax/Strict`      │
+│ • Content Security Policy    │ • Anti-CSRF Synchronizer     │
+│   (CSP)                      │   Tokens                     │
+└──────────────────────────────┴──────────────────────────────┘
+```
+
+---
+
+### 5. First-Party vs Third-Party Cookies (প্রাইভেসি বিপ্লব)
+
+- **First-Party Cookie:** ইউজার যে সাইটে আছেন (যেমন `nytimes.com`), সেই সাইটের নিজস্ব ডোমেইন দ্বারা সেট করা কুকি। এটি লগইন ও সেশন ধরে রাখতে প্রয়োজনীয়।
+- **Third-Party Cookie:** পেজের ভেতর লোড হওয়া থার্ড-পার্টি অ্যাড ট্র্যাকার (যেমন `facebook.com` বা `doubleclick.net`) দ্বারা সেট করা কুকি। ইউজার ইন্টারনেটে কোন কোন সাইটে যাচ্ছেন তা গোপনে ট্র্যাক করতে এটি ব্যবহৃত হতো।
+- **আধুনিক প্রেক্ষাপট:** Safari (ITP), Firefox (ETP) এবং Chrome থার্ড-পার্টি ট্র্যাকিং কুকি সম্পূর্ণরূপে ব্লক বা ফেজ-আউট করেছে। এর বদলে প্রাইভেসি-ফার্স্ট প্রপোজাল (যেমন Privacy Sandbox, Storage Access API) গৃহীত হচ্ছে।
+
+---
+
+### 6. Failure Modes & Production Mitigations
+
+#### Failure Mode 1: CSRF via Simple State-Changing GET Requests
+- **ঝুঁকি:** অলস ডেভেলপার টাকা ট্রান্সফার করার এপিআই বানিয়েছে GET মেথড দিয়ে: `GET /transfer?to=hacker&amount=1000`। আক্রমণকারী তার ব্লগে একটি সাধারণ ইমেজ ট্যাগ বসিয়ে দিয়েছে: `<img src="https://bank.com/transfer?to=hacker&amount=1000">`। ভিকটিম পেজটি দেখা মাত্রই ব্রাউজার ইমেজ আনতে গিয়ে টাকা ট্রান্সফার করে ফেলবে!
+- **প্রতিরোধ (Mitigation):** কোনো অবস্থাতেই GET মেথডে স্টেট পরিবর্তন না করা; স্টেট পরিবর্তনের জন্য কঠোরভাবে POST/PUT ব্যবহার করা এবং সাথে `SameSite=Lax` ও Anti-CSRF Token এনফোর্স করা।
+
+---
+
+### 7. Senior / Staff Engineer Interview Defense
+
+> **ইন্টারভিউয়ার:** *"ওয়েব অ্যাপ্লিকেশনে অথেনটিকেশন সেশনের জন্য লোকাল স্টোরেজ (localStorage) বনাম HttpOnly Secure Cookie—কোনটি ব্যবহার করবেন এবং কেন?"*
+>
+> 💡 **Staff-Level উত্তরের কাঠামো:**
+> "ওয়েব ব্রাউজারে অথেনটিকেশন সেশন ম্যানেজমেন্টের জন্য নিঃসন্দেহে **HttpOnly, Secure, SameSite Cookie** একমাত্র নিরাপদ পেশাদার স্থাপত্যিক পছন্দ:
+> 1. **লোকাল স্টোরেজের ভয়াবহ এক্সপোজার:** `localStorage`-এ টোকেন সংরক্ষণ করলে পেজের যেকোনো জাভাস্ক্রিপ্ট কোড তা সরাসরি এক্সেস করতে পারে। আধুনিক ওয়েব অ্যাপ্লিকেশনে হাজার হাজার থার্ড-পার্টি এনপিএম ডিপেন্ডেন্সি, চ্যাট উইজেট এবং অ্যানালিটিক্স স্ক্রিপ্ট থাকে। একটি ডিপেন্ডেন্সিতে সাপ্লাই-চেইন বাগ ঢুকলেই সমস্ত ইউজারের সেশন টোকেন এক সেকেন্ডে হ্যাকারের সার্ভারে এক্সফিলট্রেট (Exfiltrate) হয়ে যাবে।
+> 2. **HttpOnly-এর সুরক্ষা বলয়:** কুকিতে `HttpOnly` ফ্ল্যাগ সেট থাকলে ব্রাউজারের জাভাস্ক্রিপ্ট ইঞ্জিন মেমোরি থেকে সেই কুকি পড়তে পারে না; এমনকি সাইটে মারাত্মক XSS দুর্বলতা থাকলেও হ্যাকার সরাসরি সেশন কি চুরি করতে অক্ষম।
+> 3. **CSRF প্রশমন:** কুকি ব্যবহার করলে যে সিএসআরএফ (CSRF) ঝুঁকি আসে, তা আধুনিক ওয়েবে `SameSite=Lax` বা `Strict` ফ্ল্যাগ এবং স্টেট-চেঞ্জিং রিকোয়েস্টে একটি কাস্টম হেডার (যেমন `X-Requested-With` বা `X-CSRF-Token`) বাধ্যতামূলক করার মাধ্যমে শতভাগ প্রতিহত করা যায়।
+> তাই আমরা ব্রাউজার অ্যাপ্লিকেশনে সর্বদা **HttpOnly SameSite Cookie**-কে গোল্ডেন স্ট্যান্ডার্ড হিসেবে গ্রহণ করব।"
+
+---
+
+## 📝 Practice Questions
+
+```markdown
+### Basic Practice Questions
+1. HTTP Cookie কী এবং এটি একটি স্ট্যাটলেস প্রোটোকলকে কীভাবে স্ট্যাটফুল বানায়?
+2. একটি কুকির সর্বোচ্চ আকার (Size limit) কত বাইট হতে পারে?
+3. `HttpOnly` ফ্ল্যাগের মূল কাজ কী এবং এটি কোন ধরণের সাইবার আক্রমণ প্রতিরোধ করে?
+4. `Secure` ফ্ল্যাগ না থাকলে কুকির কী নিরাপত্তা ঝুঁকি তৈরি হয়?
+5. Session Cookie এবং Persistent Cookie-র মধ্যে পার্থক্য কী?
+
+### Intermediate Practice Questions
+6. `SameSite=Strict`, `SameSite=Lax` এবং `SameSite=None`-এর মধ্যে পার্থক্য বিশ্লেষণ করুন।
+7. Cross-Site Request Forgery (CSRF) কীভাবে কাজ করে এবং `SameSite` কীভাবে এটি সমাধান করে?
+8. Anti-CSRF Token (Synchronizer Token Pattern) কীভাবে ডাবল-সাবমিট কুকি দিয়ে কাজ করে?
+9. Third-Party Tracking Cookies কী এবং আধুনিক ব্রাউজারগুলো কেন এটি নিষিদ্ধ করছে?
+10. Cookie Prefix (`__Host-` এবং `__Secure-`) কী এবং এটি কীভাবে সাবডোমেন কুকি ওভাররাইটিং রোধ করে?
+
+### Advanced / Staff-Level Questions
+11. মাইক্রোসার্ভিস আর্কিটেকচারে যখন ফ্রন্টএন্ড (`app.domain.com`) এবং ব্যাকএন্ড (`api.domain.com`) আলাদা সাবডোমেনে থাকে, তখন সেশন কুকি শেয়ারিং কীভাবে সিকিউর ও সীমাবদ্ধ রাখবেন?
+12. Cookie Tossing Attack কী এবং কীভাবে একজন ক্ষতিকর সাবডোমেন ওনার প্যারেন্ট ডোমেনের কুকি করাপ্ট করতে পারে?
+13. Safari-র Intelligent Tracking Prevention (ITP) কীভাবে ক্লায়েন্ট-সাইড CNAME Cloaking এবং কুকির লাইফটাইমকে মাত্র ৭ বা ২৪ ঘণ্টায় সংকুচিত করে দেয়?
+14. Partitioned Cookies (CHIPS - Cookies Having Independent Partitioned State): মাল্টি-টিন্যান্ট iframe উইজেটে ক্রস-সাইট ট্র্যাকিং না করে কীভাবে বৈধ ফাংশনাল কুকি সেভ করবেন?
+15. ব্যাংকিং সিস্টেমে লগআউট করার সময় ক্লায়েন্ট ব্রাউজারের কুকি মুছে ফেলার পাশাপাশি সার্ভার-সাইড রেডিস সেশন স্টোরেজে কেন অবিলম্বে ডিলিট কম্যান্ড পাঠানো বাধ্যতামূলক?
+```
+
+---
+
+## 🔑 Answer Key & Self-Test Evaluation
+
+<details>
+<summary>👉 <b>Answer Key ও সমাধান দেখতে এখানে ক্লিক করুন</b></summary>
+
+1. **সংজ্ঞা:** সার্ভার কর্তৃক ব্রাউজারে প্রেরিত ছোট টেক্সট যা ব্রাউজার প্রতিটি পরবর্তী রিকোয়েস্টে সাথে পাঠায়, ফলে সার্ভার সেশন স্টেট চেনে।
+2. **সাইজ লিমিট:** সর্বোচ্চ ৪ কিলোবাইট (৪০৯৬ বাইট)।
+3. **HttpOnly:** জাভাস্ক্রিপ্টকে কুকি রিড করা থেকে ব্লক করে XSS আক্রমণ দ্বারা সেশন টোকেন চুরি প্রতিহত করে।
+4. **Secure না থাকার ঝুঁকি:** প্লেইন HTTP-তে কুকি ক্লিয়ারটেক্সটে ওয়্যারে চলে যায়, ফলে নেটওয়ার্ক স্নাইফাররা সেশন হাইজ্যাক করতে পারে।
+5. **Session vs Persistent:** Session কুকির কোনো Expire ডেট থাকে না, ব্রাউজার বন্ধ করলে মুছে যায়; Persistent কুকি ডিস্কে নির্দিষ্ট সময় (Max-Age) পর্যন্ত থাকে।
+6. **SameSite ভ্যারিয়েন্টস:** Strict কখনোই ক্রস-সাইটে পাঠায় না; Lax বাহ্যিক লিঙ্কের টপ-লেভেল GET রিকোয়েস্টে পাঠায় কিন্তু POST-এ ব্লক করে; None সবখানে পাঠায় (Secure বাধ্যতামূলক)।
+7. **CSRF ও সমাধান:** হ্যাকার ভিকটিমের ব্রাউজারের অটো-কুকি পাঠানোর ক্ষমতা দিয়ে ক্ষতিকর রিকোয়েস্ট করায়। `SameSite=Lax` বহিরাগত সাইটের POST কলে কুকি ব্লক করে আক্রমণ থামায়।
+8. **Anti-CSRF Tokens:** ফর্মের ভেতরে একটি গোপন টোকেন রাখা যা সার্ভারের সেশনের সাথে মেলে। হ্যাকার সাইট এই গোপন টোকেন জানতে পারে না, ফলে সাবমিশন ফেইল করে।
+9. **Third-party Phaseout:** বিভিন্ন সাইটের বিজ্ঞাপন ট্র্যাকার ইউজারকে ইন্টারনেটে গোপনে ট্র্যাক করে প্রোফাইল বানাত; ইউজার প্রাইভেসি রক্ষার্থে ব্রাউজারগুলো এটি বন্ধ করছে।
+10. **Cookie Prefixes:** `__Host-` প্রিফিক্স থাকলে কুকি কোনো সাবডোমেন থেকে ওভাররাইট করা যায় না, অবশ্যই Secure হতে হয় এবং Path='/' হতে হয়।
+11. **Subdomain Cookie:** `Domain=.domain.com` সেট করে সাবডোমেনের মধ্যে শেয়ার করা যায়, তবে কোনো সাবডোমেন হ্যাক হলে অন্য সাবডোমেনের কুকি পড়ার ঝুঁকি থাকে।
+12. **Cookie Tossing:** হ্যাকার একটি সাবডোমেন হ্যাক করে প্যারেন্ট ডোমেনের নামে ভুয়া কুকি রাইট করে ক্লায়েন্টের আসল সেশন ওভাররাইট করে দেয়।
+13. **Safari ITP:** ট্র্যাকিং রোধে জাভাস্ক্রিপ্ট দিয়ে সেট করা কুকির মেয়াদ কমিয়ে মাত্র ১ বা ৭ দিন করে দেয়, ফলে লং-টার্ম ট্র্যাকিং অকেজো হয়।
+14. **CHIPS / Partitioned:** কুকিকে টপ-লেভেল সাইট ও ফ্রেমের ডোমেন উভয় দিয়ে পার্টিশন করা, ফলে উইজেট কাজ করে কিন্তু অন্য সাইটে ট্র্যাকিং করা যায় না।
+15. **Server Invalidation:** ব্রাউজার কুকি ড্রপ করলেও নেটওয়ার্ক থেকে চুরি হওয়া কুকি দিয়ে হ্যাকার কাজ চালিয়ে যেতে পারে, তাই সার্ভার ডাটাবেজ/রেডিসে সেশন আইডি ডিলিট করা বাধ্যতামূলক।
+
+</details>

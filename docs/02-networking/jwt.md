@@ -1,41 +1,194 @@
-# JWT
+# JWT (JSON Web Token)
 
-[Back to Networking topics](README.md) | [Module guide](../02-networking.md)
+[Back to Networking topics](README.md) · [Module guide](../02-networking.md)
 
-## Learning checklist
+## 📌 Learning Checklist
+- [ ] Understand the 3-part anatomy of a JWT: Header, Payload, and Signature (`xxxxx.yyyyy.zzzzz`).
+- [ ] Learn Base64URL encoding vs encryption (JWT is signed, NOT encrypted by default!).
+- [ ] Contrast Symmetric signing (HS256) vs Asymmetric signing (RS256/ES256) with JWKS.
+- [ ] Grasp Registered Claims (`sub`, `iss`, `aud`, `exp`, `nbf`, `iat`, `jti`).
+- [ ] Analyze the Stateless Revocation Dilemma (Blacklisting, Short TTLs, Refresh Tokens).
+- [ ] Defend JWT vs Session-based authentication in Staff-level architecture interviews.
 
-- [ ] Explain JWT in your own words.
-- [ ] Identify when it is useful and when it is a poor fit.
-- [ ] Compare its main alternatives and trade-offs.
-- [ ] Describe one failure mode and a mitigation.
-- [ ] Apply it to a realistic system-design scenario.
+---
 
-## Notes
+## 📖 Deep Dive Notes
 
-### Core idea
+### 1. সহজ সংজ্ঞা ও Intuitive Mental Model
 
-Write the definition, purpose, and operating model here.
+**JWT (JSON Web Token - RFC 7519)** হলো একটি উন্মুক্ত, কম্প্যাক্ট, এবং স্বয়ংসম্পূর্ণ (Self-contained) ইন্ডাস্ট্রি-স্ট্যান্ডার্ড ফরম্যাট যার মাধ্যমে দুই পক্ষের (যেমন: ব্রাউজার এবং সার্ভার) মধ্যে তথ্যকে একটি ডিজিটালভাবে স্বাক্ষরিত (Digitally Signed) JSON অবজেক্ট হিসেবে নিরাপদে আদান-প্রদান করা হয়।
 
-### Trade-offs
+এটি মূলত স্ট্যাটলেস অথেনটিকেশন ও অথোরাইজেশনের জন্য ব্যবহৃত হয়।
 
-| Best when | Benefits | Costs and risks | Alternatives |
-|---|---|---|---|
-| | | | |
+```
+JWT String Structure:
+header.payload.signature
+ ┌──────────┐  ┌──────────────────┐  ┌────────────────────────┐
+ │ eyJhbGci │. │ eyJzdWIiOiIxMjM0 │. │ SflKxwRJSMeKKF2QT4fwpM │
+ └──────────┘  └──────────────────┘  └────────────────────────┘
+  (Header)          (Payload)                 (Signature)
+```
 
-### Failure modes
+> 🧠 **Intuitive Mental Model (বিমানবন্দরের বোর্ডিং পাস অ্যানালজি):**
+> আপনি এয়ারপোর্টে চেক-ইন করার পর এয়ারলাইন্স আপনাকে একটি ডিজিটাল কিউআর কোড যুক্ত বোডিং পাস দিল (**JWT**)।
+> - বোর্ডিং পাসের ওপর আপনার নাম, ফ্লাইট নম্বর, আসন এবং গেট নম্বর লেখা আছে (**Payload Claims**)।
+> - নিচে এয়ারলাইন্স কর্তৃপক্ষের একটি অপরিবর্তনযোগ্য ক্রিপ্টোগ্রাফিক ডিজিটাল সিল মারা আছে (**Digital Signature**)।
+> এবার আপনি ইমিগ্রেশন, লাউঞ্জ এবং বিমানে ওঠার প্রতিটি গেটে গিয়ে সিকিউরিটিকে শুধু বোর্ডিং পাসটি দেখান। সিকিউরিটি অফিসার কোনো সেন্ট্রাল ডাটাবেজে ফোন না করেই শুধু সিলটি যাচাই করে নিশ্চিত হন যে কাগজটি খাঁটি (**Stateless Verification**)! 
+> কিন্তু মনে রাখবেন—বোর্ডিং পাসটি কিন্তু কোনো লুকানো বাক্সে নেই; যে কেউ কাগজের লেখা পড়তে পারে (**Base64 is NOT encrypted**)!
 
-- Failure:
-- Detection:
-- Mitigation:
+---
 
-## Design questions
+### 2. The 3 Parts of a JWT
 
-1. What requirement makes JWT relevant?
-2. What changes at 10x traffic or data volume?
-3. What should be measured in production?
-4. What decision would make you replace this approach?
+#### ১. Header (অ্যালগরিদম ও টোকেন টাইপ)
+```json
+{
+  "alg": "RS256",
+  "typ": "JWT"
+}
+```
+Base64URL দিয়ে এনকোড হয়ে তৈরি করে প্রথম অংশ `xxxxx`।
 
-## Practice
+#### ২. Payload (Claims বা আসল তথ্য)
+```json
+{
+  "sub": "user_12345",
+  "name": "Rahim Ahmed",
+  "role": "admin",
+  "iss": "https://auth.company.com",
+  "exp": 1725100000
+}
+```
+Base64URL দিয়ে এনকোড হয়ে তৈরি করে দ্বিতীয় অংশ `yyyyy`।
 
-Apply this topic to the exercise in the [Module 02 guide](../02-networking.md), then record the decision and its trade-offs.
+#### ৩. Signature (ডিজিটাল স্বাক্ষর - ইন্টিগ্রিটি রক্ষাকারী)
+```javascript
+HMACSHA256(
+  base64UrlEncode(header) + "." + base64UrlEncode(payload),
+  secretKey
+)
+```
+- যদি কোনো আক্রমণকারী ব্রাউজারে পে-লোড পরিবর্তন করে নিজের রোল `"role": "admin"` বানাতে চায়, তবে সিক্রেট কী না জানায় সিগনেচার আর মিলবে না। সার্ভার অবিলম্বে রিকোয়েস্ট রিজেক্ট করে দেবে!
 
+---
+
+### 3. Signing Algorithms: Symmetric (HS256) বনাম Asymmetric (RS256/ES256)
+
+```
+Symmetric (HS256 - Shared Secret):
+[ Auth Server ] ──── (Signs with Secret 'abc') ────► [ API Service ]
+                                                     (Verifies with SAME Secret 'abc'!)
+(ঝুঁকি: যে ভেরিফাই করতে পারে সে চাইলে নতুন টোকেনও তৈরি করতে পারে!)
+
+Asymmetric (RS256 - Public/Private Keypair):
+[ Auth Server ] ──── (Signs with PRIVATE Key) ─────► [ 100 Microservices ]
+                                                     (Verify with PUBLIC Key via JWKS!)
+(নিরাপদ: মাইক্রোসার্ভিসগুলো কেবল টোকেন যাচাই করতে পারে, কখনোই ভুয়া টোকেন বানাতে পারে না!)
+```
+
+---
+
+### 4. The Stateless Revocation Dilemma (টোকেন বাতিলের মহা-সংকট)
+
+JWT-এর সবচেয়ে বড় সুবিধা—এটি **Stateless** (সার্ভারকে ডাটাবেজে দেখতে হয় না)। 
+কিন্তু এটিই তার সবচেয়ে মারাত্মক দুর্বলতা!
+- একবার একটি JWT ইস্যু হয়ে গেলে, তার মেয়াদ (যেমন: ১ ঘণ্টা) শেষ না হওয়া পর্যন্ত সার্ভার চাইলেও তাকে **তাৎক্ষণিকভাবে বাতিল (Revoke/Invalidate) করতে পারে না!**
+- কোনো ইউজার পাসওয়ার্ড রিসেট করলে, পারমিশন কেড়ে নিলে, বা মোবাইল ফোন চুরি হয়ে গেলে হ্যাকার সেই ১ ঘণ্টা ধরে পুরো এক্সেস ভোগ করতে পারে।
+
+#### সমাধান: Hybrid Revocation Strategies
+1. **Ultra-Short Access Tokens (5 to 15 mins):** এক্সেস টোকেনের লাইফটাইম হবে মাত্র ৫-১০ মিনিট। দীর্ঘমেয়াদী এক্সেসের জন্য রিফ্রেশ টোকেন ব্যবহার করা।
+2. **Redis Token Blacklist (Bloom Filter):** কেবল যে টোকেনগুলো নির্দিষ্টভাবে লগআউট বা ব্যান হয়েছে, তাদের `jti` (JWT ID) রেডিসের একটি ব্ল্যাকলিস্টে তাদের অবশিষ্ট মেয়াদের জন্য সংরক্ষণ করা।
+3. **User Token Epoch / Version:** ডাটাবেজে ইউজারের টেবিলে একটি `token_version: 1` রাখা। পাসওয়ার্ড বদলালে `token_version: 2` করা। JWT পে-লোডে পুরোনো ভার্সন থাকলে এপিআই গেটওয়ে সাথে সাথে রিজেক্ট করবে।
+
+---
+
+### 5. Alternatives & Comparison Matrix
+
+| বৈশিষ্ট্য | Stateless JWT | Stateful Server Sessions (Redis) |
+|---|---|---|
+| **সার্ভার মেমোরি / ডিবি ওভারহেড** | **শূন্য (সম্পূর্ণ স্ট্যাটলেস)** | প্রতি সেশনের জন্য ডাটাবেজ/রেডিসে মেমোরি লাগে |
+| **তাৎক্ষণিক লগআউট / রিভোকেশন** | ❌ খুব জটিল (ব্ল্যাকলিস্ট লাগে) | ✅ **তাত্ক্ষণিক ও সহজ (রেডিস থেকে কি ডিলিট)** |
+| **নেটওয়ার্ক ব্যান্ডউইথ** | বড় সাইজ (প্রতি রিকোয়েস্টে ১-২ কেবি হেডার) | অতি ক্ষুদ্র (মাত্র ৩২ বাইটের সেশন আইডি কুকি) |
+| **মাইক্রোসার্ভিস ডিকাপলিং** | **চমৎকার (অফলাইনে লোকাল ভ্যালিডেশন)** | প্রতিটি মাইক্রোসার্ভিসকে সেন্ট্রাল রেডিস কল করতে হয় |
+| **আদর্শ ব্যবহারের ক্ষেত্র** | মাইক্রোসার্ভিস অথরাইজেশন, মোবাইল অ্যাপ | প্রথাগত ওয়েব অ্যাপ, উচ্চ-নিরাপত্তা ব্যাংকিং |
+
+---
+
+### 6. Failure Modes & Security Anti-Patterns
+
+#### Failure Mode 1: The "alg: none" Vulnerability
+- **ঝুঁকি:** হ্যাকার হেডার পরিবর্তন করে দিল: `{"alg": "none"}` এবং সিগনেচার অংশটি ফাঁকা রাখল। ত্রুটিপূর্ণ কিছু লিগ্যাসি JWT লাইব্রেরি মনে করত কোনো সিগনেচারের দরকার নেই এবং আক্রমণকারীকে ফুল অ্যাডমিন এক্সেস দিয়ে দিত!
+- **প্রতিরোধ (Mitigation):** সার্ভার কোডে কঠোরভাবে অ্যালগরিদম হোয়াইটলিস্ট এনফোর্স করা: `algorithms=['RS256']`।
+
+#### Failure Mode 2: Storing Sensitive Data in Plaintext Payload
+- **ঝুঁকি:** অনেকে মনে করেন JWT এনক্রিপ্টেড। অজ্ঞতাবশত পে-লোডে ইউজারের পাসওয়ার্ড হ্যাশ বা ক্রেডিট কার্ড নম্বর ঢুকিয়ে দেন। যে কেউ Base64 ডিকোড করে প্লেইন টেক্সট দেখে ফেলে।
+- **প্রতিরোধ:** JWT সাইনড, এনক্রিপ্টেড নয়। সংবেদনশীল তথ্য কখনোই সাধারণ JWT-তে রাখা যাবে না (রাখতে হলে JWE - JSON Web Encryption ব্যবহার করতে হবে)।
+
+---
+
+### 7. Senior / Staff Engineer Interview Defense
+
+> **ইন্টারভিউয়ার:** *"সিস্টেম ডিজাইনে কখন আপনি Stateful Session (Redis) বেছে নেবেন, আর কখন Stateless JWT বেছে নেবেন? কেন অনেকেই বলেন 'Stop using JWT for web sessions'?"*
+>
+> 💡 **Staff-Level উত্তরের কাঠামো:**
+> "সফটওয়্যার ইন্ডাস্ট্রিতে JWT-র অতিরিক্ত অপব্যবহার একটি সুপরিচিত অ্যান্টি-প্যাটার্ন। এদের সঠিক স্থাপত্যিক ক্ষেত্র আলাদা:
+> 1. **কখন Stateful Redis Sessions শ্রেষ্ঠ (ওয়েব ব্রাউজার অ্যাপ্লিকেশন):**
+>    - ব্যাংকিং, ফিনটেক বা সাধারণ ওয়েব অ্যাপে যেখানে ইউজার ব্যান, রিয়েল-টাইম পারমিশন রিভোকেশন এবং তাৎক্ষণিক 'Logout from all devices' সবচেয়ে গুরুত্বপূর্ণ নিরাপত্তা বৈশিষ্ট্য।
+>    - কুকি-ভিত্তিক সেশন সাইজে মাত্র ৩২ বাইট যা ব্যান্ডউইথ বাঁচায় এবং সিকিউরিটি অডিট সহজ রাখে।
+> 2. **কখন Stateless JWT শ্রেষ্ঠ (ডিস্ট্রিবিউটেড মাইক্রোসার্ভিস ও মোবাইল API):**
+>    - যখন ৫০টি অভ্যন্তরীণ মাইক্রোসার্ভিসের ক্লাস্টারে প্রতি সেকেন্ডে ১ মিলিয়ন আরপিসি কল হয়। প্রতিটি সার্ভিস যদি প্রতি রিকোয়েস্টে সেন্ট্রাল রেডিসে পিং করতে যায়, তবে রেডিস একটি বিশাল সিঙ্গেল পয়েন্ট অফ ফেইলিউর ও নেটওয়ার্ক বটলনেক হয়ে দাঁড়াবে।
+>    - এখানে সার্ভিসের মাঝে পাবলিক কী (JWKS) দিয়ে স্ট্যাটলেসভাবে অফলাইনে মাইক্রোসেকেন্ডে JWT ভ্যালিডেট করা অপরিহার্য।
+> 3. **আমাদের প্রস্তাবিত হাইব্রিড আর্কিটেকচার:**
+>    - এজ গেটওয়েতে ক্লায়েন্টের সাথে **Stateful HttpOnly Session Cookie** বজায় রাখা; আর এপিআই গেটওয়ে ক্লায়েন্টের সেশন ভ্যালিডেট করে পেছনের অভ্যন্তরীণ মাইক্রোসার্ভিসগুলোতে একটি ক্ষণস্থায়ী (২ মিনিট মেয়াদী) **Signed JWT** ইনজেক্ট করে পাঠাবে।"
+
+---
+
+## 📝 Practice Questions
+
+```markdown
+### Basic Practice Questions
+1. JWT-র ৩টি প্রধান অংশের নাম কী এবং এদেরকে ডিলিমিটার হিসেবে কী দিয়ে আলাদা করা হয়?
+2. Base64URL এনকোডিং এবং এনক্রিপশনের মধ্যকার মৌলিক পার্থক্য কী?
+3. JWT-র পে-লোড কি গোপন (Confidential) থাকে? সাধারণ ব্রাউজার কি এটি দেখতে পারে?
+4. JWT সিগনেচারের মূল উদ্দেশ্য কী?
+5. `exp` এবং `sub` ক্লেইমের পূর্ণরূপ ও কাজ কী?
+
+### Intermediate Practice Questions
+6. Symmetric Signing (HS256) এবং Asymmetric Signing (RS256)-এর মধ্যে মাইক্রোসার্ভিস সিকিউরিটিতে কোনটিকে প্রাধান্য দেওয়া উচিত এবং কেন?
+7. JWT-র সবচেয়ে বড় স্থাপত্যিক অসুবিধা—তাৎক্ষণিক রিভোকেশন (Stateless Revocation)—কীভাবে সমাধান করবেন?
+8. The "alg: none" আক্রমণ কী এবং কীভাবে এটি লাইব্রেরি লেভেলে প্রতিরোধ করা যায়?
+9. JWKS (JSON Web Key Set) কী এবং মাইক্রোসার্ভিসগুলো কীভাবে পাবলিক কী ডাইনামিকালি রোটেশন করে?
+10. JWT কেন লোকাল স্টোরেজে (localStorage) না রেখে `HttpOnly, Secure` কুকিতে রাখা উচিত?
+
+### Advanced / Staff-Level Questions
+11. JWE (JSON Web Encryption) বনাম JWS (JSON Web Signature)—কখন ডেটার গোপনীয়তার জন্য সাইনিংয়ের পাশাপাশি এনক্রিপশন প্রয়োজন হয়?
+12. কোটি কোটি কনকারেন্ট ব্যবহারকারীর জন্য একটি গ্লোবাল JWT ব্ল্যাকলিস্টিং আর্কিটেকচার ডিজাইন করতে Redis Bloom Filter কীভাবে মেমোরি সাশ্রয়ী ভূমিকা রাখে?
+13. Token Binding (RFC 8473) কীভাবে কাজ করে এবং কীভাবে এটি চুরি হওয়া JWT অন্য কোনো ক্ষতিকর ক্লায়েন্ট কর্তৃক ব্যবহার করা প্রতিহত করে?
+14. মাইক্রোসার্ভিসে টোকেন প্রপাগেশনের সময় User Identity Token বনাম Service Identity Token (M2M) কীভাবে আলাদা স্তর বজায় রাখে?
+15. পাসওয়ার্ড পরিবর্তন করার সাথে সাথে অন্য সমস্ত ডিভাইসে বিদ্যমান অ্যাক্টিভ JWT-কে ডাটাবেজ লুকআপ ছাড়াই কীভাবে ক্রিপ্টোগ্রাফিক টাইমস্ট্যাম্প ভ্যালিডেশন দিয়ে ইনভ্যালিডেট করবেন?
+```
+
+---
+
+## 🔑 Answer Key & Self-Test Evaluation
+
+<details>
+<summary>👉 <b>Answer Key ও সমাধান দেখতে এখানে ক্লিক করুন</b></summary>
+
+1. **অংশ ও ডিলিমিটার:** Header, Payload, Signature; ডট (`.`) চিহ্ন দিয়ে আলাদা করা হয়।
+2. **Encoding vs Encryption:** Encoding কেবল ডেটাকে বাইনারি থেকে টেক্সটে রূপান্তর করে যা যে কেউ ডিকোড করতে পারে; Encryption ডেটাকে ক্রিপ্টোগ্রাফিক গোপন করে যা চাবি ছাড়া পড়া যায় না।
+3. **পে-লোডের দৃশ্যমানতা:** পে-লোড সম্পূর্ণ উন্মুক্ত। যে কেউ jwt.io-তে পেস্ট করে ভেতরের সমস্ত ডেটা পড়তে পারে।
+4. **সিগনেচারের কাজ:** ডেটার অখণ্ডতা (Integrity) প্রমাণ করা; মাঝপথে কেউ ১টি অক্ষরও পরিবর্তন করলে সিগনেচার ইনভ্যালিড হয়ে যায়।
+5. **Claims:** `sub` = Subject (ইউজারের ইউনিক আইডি); `exp` = Expiration time (মেয়াদোত্তীর্ণের ইউনিক্স টাইমস্ট্যাম্প)।
+6. **RS256 শ্রেষ্ঠত্ব:** অথ সার্ভারের কাছে শুধু প্রাইভেট কী থাকে; মাইক্রোসার্ভিসগুলোর কাছে শুধু পাবলিক কী থাকে। ফলে কোনো মাইক্রোসার্ভিস হ্যাক হলেও ভুয়া টোকেন বানাতে পারে না।
+7. **Revocation সমাধান:** ৫ মিনিটের শর্ট-লিভড এক্সেস টোকেন, সাথে রিফ্রেশ টোকেন রোটেশন এবং লগআউটের জন্য রেডিস ব্ল্যাকলিস্ট।
+8. **alg: none:** আক্রমণকারী অ্যালগরিদম নান করে সিগনেচার ছাড়া পাঠায়। প্রতিরোধ: সার্ভার কোডে `alg` বাধ্যতামূলকভাবে চেক করা।
+9. **JWKS:** একটি পাবলিক ওয়েব এন্ডপয়েন্ট (`/.well-known/jwks.json`) যা অথ সার্ভারের বর্তমান পাবলিক কী তালিকা প্রকাশ করে।
+10. **Cookie vs localStorage:** লোকাল স্টোরেজের ডেটা যেকোনো জাভাস্ক্রিপ্ট XSS স্ক্রিপ্ট দিয়ে চুরি করা যায়; `HttpOnly` কুকি জাভাস্ক্রিপ্ট পড়তে পারে না।
+11. **JWE vs JWS:** JWS শুধু সাইন করে (সবাই পড়তে পারে); JWE ডেটা এনক্রিপ্ট করে রাখে (প্রাইভেট কি ছাড়া কেউ পড়তে পারে না)।
+12. **Bloom Filter ব্ল্যাকলিস্ট:** গিগাবাইট স্টোরেজ না পুড়িয়ে মেগাবাইট মেমোরিতে প্রবাবিলিস্টিক উপায়ে চেক করা টোকেনটি ব্ল্যাকলিস্টেড কিনা।
+13. **Token Binding:** টোকেনটিকে ক্লায়েন্টের নির্দিষ্ট TLS সকেট বা ক্রিপ্টোগ্রাফিক প্রুফের সাথে বেঁধে দেওয়া, ফলে টোকেন চুরি করলেও অন্য কম্পিউটার থেকে চলবে না।
+14. **User vs Service Token:** ইউজারের অনুমতি পাস করতে এন্ড-ইউজার JWT; আর সার্ভিস-টু-সার্ভিস mTLS বা ইন্টারনাল ক্লায়েন্ট ক্রেডেনশিয়ালস টোকেন ব্যবহৃত হয়।
+15. **Password Reset Invalidation:** ইউজারের অবজেক্টে `password_changed_at` টাইমস্ট্যাম্প রাখা। JWT-র `iat` (Issued At) যদি পাসওয়ার্ড পরিবর্তনের আগের হয়, তবে গেটওয়ে সাথে সাথে রিজেক্ট করবে।
+
+</details>

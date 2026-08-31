@@ -1,41 +1,169 @@
-# TCP/IP
+# TCP/IP Protocol Suite
 
-[Back to Networking topics](README.md) | [Module guide](../02-networking.md)
+[Back to Networking topics](README.md) · [Module guide](../02-networking.md)
 
-## Learning checklist
+## 📌 Learning Checklist
+- [ ] Understand the 4-layer TCP/IP model vs 7-layer OSI model.
+- [ ] Master the TCP 3-Way Handshake (`SYN -> SYN-ACK -> ACK`) and 4-Way Teardown (`FIN -> ACK -> FIN -> ACK`).
+- [ ] Grasp TCP Flow Control (Sliding Window) vs Congestion Control (Slow Start, Congestion Avoidance, Fast Retransmit).
+- [ ] Learn Modern Congestion Algorithms: AIMD, CUBIC, and Google BBR (Bottleneck Bandwidth and RTT).
+- [ ] Analyze TCP Head-of-Line (HoL) Blocking and socket buffer tuning.
+- [ ] Defend TCP performance, `TIME_WAIT` socket exhaustion, and kernel bypass in Staff-level interviews.
 
-- [ ] Explain TCP/IP in your own words.
-- [ ] Identify when it is useful and when it is a poor fit.
-- [ ] Compare its main alternatives and trade-offs.
-- [ ] Describe one failure mode and a mitigation.
-- [ ] Apply it to a realistic system-design scenario.
+---
 
-## Notes
+## 📖 Deep Dive Notes
 
-### Core idea
+### 1. সহজ সংজ্ঞা ও Intuitive Mental Model
 
-Write the definition, purpose, and operating model here.
+**TCP/IP (Transmission Control Protocol / Internet Protocol)** হলো আধুনিক ইন্টারনেটের ভিত্তিপ্রস্তর—এমন একটি প্রমিত নেটওয়ার্ক প্রোটোকল সুইট যা কম্পিউটারগুলোর মধ্যে নির্ভরযোগ্য, ক্রমানুসারে (In-order), এবং ত্রুটিমুক্ত ডেটা প্যাকেট আদান-প্রদান নিশ্চিত করে।
 
-### Trade-offs
+- **IP (Internet Protocol - Layer 3):** প্রতিটি ডিভাইসকে একটি ইউনিক আইপি অ্যাড্রেস প্রদান করে এবং নেটওয়ার্কের এক হোস্ট থেকে অন্য হোস্টে প্যাকেট রাউটিং করে (Best-effort delivery, ডেটা পৌঁছানোর কোনো গ্যারান্টি দেয় না)।
+- **TCP (Transmission Control Protocol - Layer 4):** আইপির ওপরে বসে একটি কানেকশন-ওরিয়েন্টেড (Connection-oriented), নির্ভরযোগ্য ডেটা স্ট্রিম তৈরি করে। প্যাকেট হারিয়ে গেলে রি-ট্রান্সমিট করে এবং প্যাকেটের ক্রম ($1, 2, 3...$) অক্ষুণ্ণ রাখে।
 
-| Best when | Benefits | Costs and risks | Alternatives |
+> 🧠 **Intuitive Mental Model (নিবন্ধিত ডাক কুরিয়ার সার্ভিস অ্যানালজি):**
+> আপনি একটি ১০০ পৃষ্ঠার বই ফটোকপি করে ডাকযোগে বন্ধুকে পাঠাতে চান।
+> - **IP (সাধারণ চিঠি):** প্রতিটি পৃষ্ঠা আলাদা আলাদা খামে ভরে পোস্টবক্সে ফেলে দেওয়া হলো। কোনো খাম দ্রুত পৌঁছাতে পারে, কোনোটি হারিয়ে যেতে পারে, কোনোটি বৃষ্টিতে ভিজে নষ্ট হতে পারে।
+> - **TCP (নিবন্ধিত রিসিট সহ ডাক কুরিয়ার):** প্রতিটি খামের ওপর পৃষ্ঠা নম্বর ($1, 2, 3...$) এবং ট্র্যাকিং আইডি লেখা হলো। কুরিয়ার বন্ধুকে ফোন করে নিশ্চিত করল সে চিঠি নেওয়ার জন্য প্রস্তুত (**3-Way Handshake**)। বন্ধু প্রতি ১০টি পৃষ্ঠা পাওয়ার পর কুরিয়ারকে রিসিট পাঠাল (**ACK**)। ৫ নম্বর পৃষ্ঠাটি হারিয়ে গেলে কুরিয়ার পুনরায় শুধু ৫ নম্বর পৃষ্ঠাই পাঠিয়ে দিল (**Retransmission**)। বন্ধু সমস্ত পৃষ্ঠা ঠিকমতো সাজিয়ে তবেই বইটি পড়তে শুরু করল (**In-order delivery**)।
+
+---
+
+### 2. TCP Lifecycle: 3-Way Handshake & 4-Way Teardown
+
+```
+[ TCP 3-Way Handshake (Connection Setup) ]
+Client                                           Server
+  │ ──────── SYN (seq=x) ─────────────────────────> │ (LISTEN)
+  │                                                 │ (SYN-RCVD)
+  │ <─────── SYN-ACK (seq=y, ack=x+1) ───────────── │
+  │ (ESTABLISHED)                                   │
+  │ ──────── ACK (ack=y+1) ───────────────────────> │ (ESTABLISHED)
+  ▼                                                 ▼
+[ Data Transfer: Bi-directional Full-Duplex Stream ]
+  ▲                                                 ▲
+  │ ──────── FIN (seq=u) ─────────────────────────> │ (CLOSE-WAIT)
+  │ <─────── ACK (ack=u+1) ──────────────────────── │
+  │                                                 │
+  │ <─────── FIN (seq=v) ────────────────────────── │ (LAST-ACK)
+  │ (TIME-WAIT: 2MSL)                               │
+  │ ──────── ACK (ack=v+1) ───────────────────────> │ (CLOSED)
+```
+
+#### The `TIME_WAIT` State:
+- কানেকশন ক্লোজ করার পর ক্লায়েন্ট অবিলম্বে সকেট মুছে ফেলে না; সে **2MSL (Maximum Segment Lifetime - সাধারণত ৬০ থেকে ১২০ সেকেন্ড)** `TIME_WAIT` স্টেটে অপেক্ষা করে।
+- **উদ্দেশ্য:** 
+  1. শেষ `ACK` প্যাকেটটি নেটওয়ার্কে হারিয়ে গেলে সার্ভার আবার `FIN` পাঠাবে, ক্লায়েন্ট বেঁচে না থাকলে সার্ভার কানেকশন ড্রপ করতে পারবে না।
+  2. নেটওয়ার্কে দেরি করে আসা পুরোনো ডুপ্লিকেট প্যাকেটগুলো যেন একই পোর্টে চালু হওয়া নতুন কানেকশনের ডেটার সাথে মিশে না যায়।
+
+---
+
+### 3. Flow Control vs Congestion Control
+
+| মেকানিজম | কাকে রক্ষা করে? | নিয়ন্ত্রক প্যারামিটার | কীভাবে কাজ করে? |
 |---|---|---|---|
-| | | | |
+| **Flow Control** | **Receiver (প্রাপক)-কে** রক্ষা করে যাতে দ্রুতগামী সেন্ডারের ডেটায় রিসিভারের মেমোরি বাফার উপচে না পড়ে। | **Receive Window (rwnd)** | রিসিভার প্রতিটি ACK প্যাকেটে তার বাফারের ফাঁকা জায়গা (`rwnd`) সেন্ডারকে জানিয়ে দেয়। বাফার ফুল হলে `rwnd=0` পাঠিয়ে সেন্ডারকে থামিয়ে দেয়। |
+| **Congestion Control** | **Internet Network (রাউটার ও লিঙ্ক)-কে** রক্ষা করে যাতে ইন্টারনেটের ব্যান্ডউইথ স্যাচুরেটেড না হয়। | **Congestion Window (cwnd)** | সেন্ডার নিজে নেটওয়ার্কের প্যাকেট লস ও RTT পর্যবেক্ষণ করে `cwnd` ছোট বা বড় করে। |
 
-### Failure modes
+$$\mathbf{\text{Effective Transmission Window} = \min(cwnd,\ rwnd)}$$
 
-- Failure:
-- Detection:
-- Mitigation:
+---
 
-## Design questions
+### 4. Modern Congestion Control Algorithms
 
-1. What requirement makes TCP/IP relevant?
-2. What changes at 10x traffic or data volume?
-3. What should be measured in production?
-4. What decision would make you replace this approach?
+```
+AIMD / Reno (Loss-based):
+Cwnd ──> Linearly Grows (+1 MSS) ──> Packet Loss ──> Drops by 50% (Sawtooth wave!)
 
-## Practice
+Google BBR (Model-based):
+Measures: Bottleneck Bandwidth & Min RTT -> Transmits at exact physical wire capacity!
+Zero Bufferbloat, 10x throughput on lossy Wi-Fi/Cellular!
+```
 
-Apply this topic to the exercise in the [Module 02 guide](../02-networking.md), then record the decision and its trade-offs.
+1. **TCP Tahoe & Reno (AIMD):** Additive Increase, Multiplicative Decrease। প্যাকেট লস হওয়া মাত্রই উইন্ডো সাইজ অর্ধেকে নামিয়ে ফেলে।
+2. **TCP CUBIC:** লিনাক্সের ডিফল্ট কনজেশন অ্যালগরিদম। এটি উইন্ডো সাইজ কিউবিক ফাংশন ($W(t) = C(t-K)^3 + W_{max}$) অনুযায়ী বাড়ায়, যা উচ্চ ব্যান্ডউইথ লিঙ্কে দ্রুত স্যাচুরেশন পয়েন্টে পৌঁছায়।
+3. **Google BBR (Bottleneck Bandwidth and RTT):** গুগল ২০১৭ সালে BBR আবিষ্কার করে। এটি প্যাকেট লসকে কনজেশনের লক্ষণ হিসেবে গণ্য করে না (কারণ ওয়াইফাই বা সেলুলারে রেডিও নয়েজেও প্যাকেট লস হয়)। এটি নেটওয়ার্কের আসল পাইপের প্রস্থ এবং রাউন্ড ট্রিপ টাইম মেপে সর্বোচ্চ গতি নিশ্চিত করে।
 
+---
+
+### 5. TCP Head-of-Line (HoL) Blocking
+
+- টিসিপি একটি অবিচ্ছিন্ন বাইট স্ট্রিম গ্যারান্টি দেয়।
+- যদি ১, ২, ৩ নম্বর প্যাকেটের মধ্যে ২ নম্বর প্যাকেটটি নেটওয়ার্কে ড্রপ হয়, তবে ৩ নম্বর প্যাকেটটি রিসিভারের কাছে আগে পৌঁছালেও অপারেটিং সিস্টেম অ্যাপ্লিকেশনকে ৩ নম্বর প্যাকেট পড়তে দেবে না!
+- ২ নম্বর প্যাকেটটি রিট্রান্সমিট হয়ে না পৌঁছানো পর্যন্ত পুরো বাফার আটকে থাকে। এটিই হলো **Transport-Level Head-of-Line Blocking**।
+
+---
+
+### 6. Alternatives & Trade-offs Comparison Matrix
+
+| বৈশিষ্ট্য | TCP | UDP | QUIC (HTTP/3) |
+|---|---|---|---|
+| **কানেকশন মডেল** | Connection-oriented (Handshake) | Connectionless | Connection-oriented (Built on UDP) |
+| **নির্ভরযোগ্যতা** | ১০০% নির্ভরযোগ্য (Retransmission) | আন-রিলায়েবল (Fire and forget) | ১০০% নির্ভরযোগ্য (Per-stream) |
+| **প্যাকেট অর্ডারিং** | কঠোরভাবে ক্রমানুসারে (In-order) | কোনো অর্ডার নেই (Out-of-order) | স্ট্রিম-ভেদে স্বাধীন ক্রম |
+| **HoL Blocking** | ❌ সমগ্র কানেকশন ব্লক হয় | ✅ কোনো ব্লকিং নেই | ✅ একক স্ট্রিম ড্রপ অন্য স্ট্রিমকে ব্লক করে না |
+| **হ্যান্ডশেক ওভারহেড** | ১ RTT (TCP) + ১-২ RTT (TLS) | ০ RTT | ০-RTT বা ১ RTT (TLS 1.3 ইন্টিগ্রেটেড) |
+
+---
+
+### 7. Senior / Staff Engineer Interview Defense
+
+> **ইন্টারভিউয়ার:** *"হাই-থ্রুপুট মাইক্রোসার্ভিস গেটওয়েতে ট্রাফিক স্পাইকের সময় হাজার হাজার `TIME_WAIT` সকেটের কারণে সার্ভার নতুন কোনো আউটবাউন্ড কানেকশন খুলতে পারছে না (`Cannot assign requested address`)। এটি কীভাবে সমাধান করবেন?"*
+>
+> 💡 **Staff-Level উত্তরের কাঠামো:**
+> "এটি অত্যন্ত পরিচিত লিনাক্স এফেমিরাল পোর্ট এক্সহস্টেশন (Ephemeral Port Exhaustion) সমস্যা। যখন একটি রিভার্স প্রক্সি বা সার্ভিস কোটি কোটি শর্ট-লিভড টিসিপি কানেকশন দ্রুত ওপেন ও ক্লোজ করে, তখন লোকাল পোর্টের সংখ্যা (সাধারণত ২৮,০০০ পোর্ট) ৬০ সেকেন্ডের জন্য `TIME_WAIT` স্টেটে লক হয়ে যায়:
+> 1. **HTTP Keep-Alive ও Connection Pooling:** সমস্যার মূল কারণ হলো প্রতি রিকোয়েস্টে নতুন TCP কানেকশন খোলা। ক্লায়েন্টে কানেকশন পুলিং চালু করে লং-লিভড কিপ-এলাইভ কানেকশন রি-ইউজ করব, যা নতুন হ্যান্ডশেকের প্রয়োজনীয়তা ৯০% কমিয়ে দেবে।
+> 2. **Kernel Socket Reuse:** লিনাক্স কার্নেলে `net.ipv4.tcp_tw_reuse = 1` সক্রিয় করব, যা ইনকামিং নতুন কানেকশনের জন্য সেফটি ভায়োলেট না করে `TIME_WAIT` সকেট পুনরায় বরাদ্দ করতে দেয়।
+> 3. **পোর্ট রেঞ্জ বৃদ্ধি:** `net.ipv4.ip_local_port_range = 1024 65535` দিয়ে এফেমিরাল পোর্টের পরিধি প্রায় দ্বিগুণ (৬০,০০০+) করব।
+> 4. **Socket TIME_WAIT Recycling (বাফার্ড সকেট):** `tcp_max_tw_buckets` টিউন করব যাতে এক্সট্রিম স্পাইকে মেমোরি উপচে না পড়ে।"
+
+---
+
+## 📝 Practice Questions
+
+```markdown
+### Basic Practice Questions
+1. TCP এবং IP-র মধ্যকার মূল দায়িত্বের পার্থক্য কী?
+2. TCP 3-Way Handshake-এর ৩টি ধাপের নাম ও সিকোয়েন্স নম্বর প্রবাহ ব্যাখ্যা করুন।
+3. TCP কানেকশন বন্ধ করতে ৪টি ধাপ (4-Way Teardown) কেন লাগে?
+4. TCP-তে Flow Control এবং Congestion Control-এর পার্থক্য কী?
+5. লিনাক্সে একটি টিসিপি সকেট কতক্ষণ `TIME_WAIT` অবস্থায় থাকে এবং কেন?
+
+### Intermediate Practice Questions
+6. TCP Head-of-Line (HoL) Blocking কী এবং কীভাবে এটি উচ্চ ল্যাটেন্সির নেটওয়ার্কে মাল্টিপ্লেক্সড ট্রাফিককে ধীর করে?
+7. Google BBR কনজেশন কন্ট্রোল অ্যালগরিদম কীভাবে প্রচলিত CUBIC বা Reno-এর চেয়ে আলাদা এবং উন্নত?
+8. Nagle's Algorithm কী এবং লো-ল্যাটেন্সি রিয়েল-টাইম সিস্টেমে কেন `TCP_NODELAY` ফ্ল্যাগ দিয়ে এটি বন্ধ করা হয়?
+9. TCP Sliding Window-এ "Zero Window Probe" কী?
+10. `TIME_WAIT` পোর্ট এক্সহস্টেশন সমস্যা কীভাবে লিনাক্স কার্নেল ও আর্কিটেকচার লেভেলে সমাধান করা হয়?
+
+### Advanced / Staff-Level Questions
+11. কোটি কোটি RPS ট্রাফিকের এন্টারপ্রাইজ গেটওয়েতে Linux Kernel Network Stack বাইপাস করতে DPDK (Data Plane Development Kit) এবং eBPF/XDP কীভাবে সরাসরি NIC থেকে প্যাকেট প্রসেস করে?
+12. স্যাটেলাইট ইন্টারনেট (যেমন Starlink) বা ট্রান্স-আটলান্টিক ফাইবার লিঙ্কে হাই Bandwidth-Delay Product (BDP) হ্যান্ডেল করতে TCP Window Scaling (RFC 1323) কীভাবে মেমোরি বাফার টিউন করে?
+13. SYN Flood DDoS আক্রমণ প্রতিরোধে Linux কার্নেলের SYN Cookies (`net.ipv4.tcp_syncookies`) কীভাবে কোনো মেমোরি স্টেট না রেখেই ক্রিপ্টোগ্রাফিকভাবে হ্যান্ডশেক ভ্যালিডেট করে?
+14. TCP Fast Open (TFO - RFC 7413) কীভাবে প্রথম হ্যান্ডশেকের ভেতরেই সিন্থেটিক কুকি ও ডেটা পে-লোড পাঠিয়ে ১ RTT সময় সাশ্রয় করে?
+15. মোবাইল ডিভাইসে সেলুলার নেটওয়ার্ক (4G/5G) থেকে হোম ওয়াইফাই নেটওয়ার্কে সুইচ করার সময় ক্লাসিক্যাল টিসিপি কেন সকেট কানেকশন ড্রপ করে এবং MPTCP (Multipath TCP) কীভাবে এটি নিরবচ্ছিন্ন রাখে?
+```
+
+---
+
+## 🔑 Answer Key & Self-Test Evaluation
+
+<details>
+<summary>👉 <b>Answer Key ও সমাধান দেখতে এখানে ক্লিক করুন</b></summary>
+
+1. **IP vs TCP:** IP হোস্ট টু হোস্ট প্যাকেট রাউট করে (বেস্ট-এফোর্ট); TCP এন্ড-টু-এন্ড নির্ভরযোগ্য, সাজানো ও ত্রুটিমুক্ত ডেটা স্ট্রিম নিশ্চিত করে।
+2. **3-Way Handshake:** ক্লায়েন্ট `SYN(seq=x)` পাঠায়; সার্ভার `SYN-ACK(seq=y, ack=x+1)` দিয়ে সাড়া দেয়; ক্লায়েন্ট `ACK(ack=y+1)` পাঠিয়ে কানেকশন প্রতিষ্ঠা করে।
+3. **4-Way Teardown:** টিসিপি হলো ফুল-ডুপ্লেক্স (উভয়মুখী)। ক্লায়েন্ট ডেটা পাঠানো শেষ করে `FIN` দিলেও সার্ভার তার পেন্ডিং ডেটা পাঠানো শেষ না হওয়া পর্যন্ত নিজের প্রান্ত খোলা রাখতে পারে।
+4. **Flow vs Congestion:** Flow রিসিভারের বাফার ওভারফ্লো আটকায় (`rwnd`); Congestion মাঝের রাউটার ও নেটওয়ার্ক পাইপ জ্যাম হওয়া আটকায় (`cwnd`)।
+5. **TIME_WAIT কারণ:** সাধারণত ৬০-১২০ সেকেন্ড (2MSL)। উদ্দেশ্য: শেষ ACK ড্রপ হলে সার্ভারকে পুনরায় FIN পাঠাতে সময় দেওয়া এবং নেটওয়ার্কের পুরোনো প্রেতাত্মা প্যাকেট নিশ্চিহ্ন হওয়া।
+6. **TCP HoL Blocking:** মাঝে ১টি প্যাকেট হারালে পরবর্তী প্যাকেটগুলো মেমোরিতে এসে বসে থাকলেও ওএস অ্যাপ্লিকেশনকে তা পড়তে দেয় না যতক্ষণ না হারানো প্যাকেটটি রিট্রান্সমিট হয়।
+7. **Google BBR:** প্যাকেট লসের ওপর নির্ভর না করে নেটওয়ার্কের সর্বোচ্চ ডেলিভারি রেট এবং সর্বনিম্ন RTT মেপে সরাসরি অপটিমাল স্পিডে ডেটা পাঠায়।
+8. **Nagle's Algorithm & TCP_NODELAY:** ছোট ছোট প্যাকেট বাফার করে একসাথে পাঠায়। চ্যাট বা গেমিংয়ে এটি ল্যাটেন্সি বাড়ায়, তাই `TCP_NODELAY` দিয়ে বাফারিং অফ করে সাথে সাথে প্যাকেট পুশ করা হয়।
+9. **Zero Window Probe:** রিসিভার বাফার ফুল হলে `rwnd=0` পাঠায়। সেন্ডার ডেটা পাঠানো বন্ধ রাখে এবং প্রতি কয়েক সেকেন্ড পর পর ১ বাইটের প্রোব প্যাকেট পাঠিয়ে দেখে বাফার খালি হয়েছে কিনা।
+10. **TIME_WAIT সমাধান:** HTTP Keep-Alive কানেকশন পুলিং ব্যবহার করা, কার্নেলে `net.ipv4.tcp_tw_reuse = 1` চালু করা এবং এফেমিরাল পোর্ট রেঞ্জ বাড়ানো।
+11. **Kernel Bypass:** ওএস কার্নেলের নেটওয়ার্ক স্ট্যাকের মেমোরি কপি এবং কনটেক্সট সুইচিং বাইপাস করে সরাসরি ইউজার স্পেস মেমোরিতে নেটওয়ার্ক ইন্টারফেস কার্ড (NIC) থেকে প্যাকেট রিড করা (DPDK)।
+12. **TCP Window Scaling:** পুরনো টিসিপি উইন্ডো সাইজ সর্বোচ্চ ৬৫,৫৩৫ বাইট (১৬ বিট) ছিল। উইন্ডো স্কেলিং অপশন এটিকে ১ গিগাবাইট পর্যন্ত বাড়ানোর অনুমতি দেয়, যা হাই-স্পিড লং লিঙ্কে থ্রুপুট বহু গুণ বাড়ায়।
+13. **SYN Cookies:** সার্ভার মেমোরিতে হাফ-ওপেন কানেকশন স্টেট জমা না রেখে ক্লায়েন্টের আইপি, পোর্ট এবং সিক্রেট কি দিয়ে এনকোড করে `SYN-ACK`-এর সিকোয়েন্স নম্বরে পাঠিয়ে দেয়। ক্লায়েন্ট ACK পাঠালে সিকোয়েন্স নম্বর ডিকোড করে কানেকশন সম্পন্ন হয়।
+14. **TCP Fast Open:** ক্লায়েন্ট পূর্বে সার্ভার থেকে পাওয়া একটি TFO ক্রিপ্টো কুকি প্রথম `SYN` প্যাকেটের সাথেই পাঠিয়ে দেয় এবং সাথে ডেটাও পাঠায়, ফলে হ্যান্ডশেক শেষ হওয়ার আগেই প্রথম রিকোয়েস্ট এক্সিকিউট হয়।
+15. **MPTCP / Mobile Handover:** সাধারণ টিসিপি (সোর্স আইপি, পোর্ট, ডেস্টিনেশন আইপি, পোর্ট)-এর ওপর নির্ভরশীল হওয়ায় আইপি বদলালে সকেট ডেড হয়ে যায়। MPTCP একই সেশনে একাধিক সাব-ফ্লো লিংক যুক্ত করতে পারে, ফলে ওয়াইফাই ড্রপ হলেও মোবাইল ডাটাতে লাইভ কানেকশন বজায় থাকে।
+
+</details>

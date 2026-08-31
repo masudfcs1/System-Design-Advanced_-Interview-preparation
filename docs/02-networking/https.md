@@ -1,41 +1,177 @@
-# HTTPS
+# HTTPS (Hypertext Transfer Protocol Secure)
 
-[Back to Networking topics](README.md) | [Module guide](../02-networking.md)
+[Back to Networking topics](README.md) · [Module guide](../02-networking.md)
 
-## Learning checklist
+## 📌 Learning Checklist
+- [ ] Understand HTTPS as HTTP encapsulated in TLS (Transport Layer Security).
+- [ ] Learn the cryptographic triad: Confidentiality (Symmetric), Integrity (HMAC), and Authenticity (Asymmetric/CAs).
+- [ ] Grasp Hybrid Cryptography: Asymmetric Key Exchange (ECDHE) + Symmetric Bulk Encryption (AES-GCM / ChaCha20).
+- [ ] Master HTTP Strict Transport Security (HSTS) and Preload Lists.
+- [ ] Analyze Certificate Revocation: CRLs vs OCSP vs OCSP Stapling.
+- [ ] Defend HTTPS performance, SSL offloading, and Forward Secrecy in Staff-level interviews.
 
-- [ ] Explain HTTPS in your own words.
-- [ ] Identify when it is useful and when it is a poor fit.
-- [ ] Compare its main alternatives and trade-offs.
-- [ ] Describe one failure mode and a mitigation.
-- [ ] Apply it to a realistic system-design scenario.
+---
 
-## Notes
+## 📖 Deep Dive Notes
 
-### Core idea
+### 1. সহজ সংজ্ঞা ও Intuitive Mental Model
 
-Write the definition, purpose, and operating model here.
+**HTTPS (HTTP Secure)** হলো সাধারণ প্লেইন-টেক্সট HTTP প্রোটোকলের একটি ক্রিপ্টোগ্রাফিক সংস্করণ যা **TLS (Transport Layer Security)** প্রোটোকলের একটি সুরক্ষিত ও এনক্রিপ্টেড সুরক্ষাবলয়ের ভেতরে পরিচালিত হয়।
 
-### Trade-offs
+এটি ইন্টারনেটের অসুরক্ষিত পাবলিক নেটওয়ার্কে ক্লায়েন্ট (ব্রাউজার/মোবাইল অ্যাপ) এবং সার্ভারের মধ্যে ৩টি মৌলিক নিরাপত্তা বৈশিষ্ট্য নিশ্চিত করে:
+1. **Confidentiality (গোপনীয়তা):** মাঝপথে থাকা কোনো আইএসপি, হ্যাকার বা ওয়াইফাই স্নাইফার প্রেরিত ডেটা (পাসওয়ার্ড, ক্রেডিট কার্ড) পড়তে পারবে না।
+2. **Integrity (অখণ্ডতা):** মাঝপথে কোনো ডেটা প্যাকেট পরিবর্তন, কাটছাঁট বা ইনজেক্ট (Man-in-the-Middle篡改) করা সম্ভব নয়।
+3. **Authentication (সত্যতা/পরিচয়):** ক্লায়েন্ট শতভাগ নিশ্চিত হতে পারে যে সে আসল ব্যাংকিং ওয়েবসাইটে কানেক্ট করেছে, কোনো ভুয়া ফিশিং সার্ভারে নয়।
 
-| Best when | Benefits | Costs and risks | Alternatives |
+```
+Plain HTTP (Vulnerable):
+[ Browser ] ─── "password=secret123" (Cleartext) ───► [ ISP / Hacker Sniffs ] ───► [ Server ]
+
+HTTPS over TLS (Secure):
+[ Browser ] ─── [Encrypted Ciphertext: 7f8a9c2...] ───► [ Hacker Sees Only Garbage ] ───► [ Server ]
+```
+
+> 🧠 **Intuitive Mental Model (স্বচ্ছ পোস্টকার্ড বনাম সাঁজোয়া ভল্ট বক্স):**
+> - **HTTP:** একটি সাধারণ পোস্টকার্ডে চিঠি লেখা। ডাকপিয়ন, কুরিয়ার ডেলিভারিম্যান বা যে কেউ মাঝপথে চিঠিটি পড়তে পারে এবং কলম দিয়ে টাকার অংক বদলে দিতে পারে (**No encryption, no integrity**)।
+> - **HTTPS:** একটি বিশেষ সাঁজোয়া ভল্ট বক্স। 
+> ক্লায়েন্ট সার্ভারের একটি পাবলিক তালা (Public Key) দিয়ে বক্সে চিঠিটি ভরে তালা মেরে দেয় (**Asymmetric Encryption**)। 
+> এবার বক্সটি মাঝপথে যে কারও হাত দিয়ে যাক না কেন, পৃথিবীর কারো কাছে সেই তালা খোলার চাবি নেই—একমাত্র ব্যাংকের সিন্দুকে থাকা প্রাইভেট চাবি (Private Key) দিয়েই কেবল বক্সটি খোলা যাবে (**Decrypted at Origin**)। 
+> বক্সের ওপর ব্যাংক কর্তৃপক্ষের সিলমোহর (Digital Certificate) দেখে ক্লায়েন্ট নিশ্চিত হয় যে এটি আসল ব্যাংকেরই তালা!
+
+---
+
+### 2. Hybrid Cryptography: কেন দুটি এনক্রিপশন একসাথে ব্যবহৃত হয়?
+
+এনক্রিপশন প্রধানত দুই প্রকার:
+1. **Asymmetric Encryption (অসমমিত এনক্রিপশন - RSA / ECC):** পাবলিক কী দিয়ে এনক্রিপ্ট, প্রাইভেট কী দিয়ে ডিক্রিপ্ট। চরম নিরাপদ, কিন্তু **সিপিইউ-এর দিক থেকে অত্যন্ত ধীর ও ভারী!**
+2. **Symmetric Encryption (সমমিত এনক্রিপশন - AES-256-GCM / ChaCha20):** একই গোপন চাবি দিয়ে এনক্রিপ্ট ও ডিক্রিপ্ট। **অবিশ্বাস্য রকমের দ্রুত (হার্ডওয়্যার এক্সিলারেটেড)**, কিন্তু ইন্টারনেটের ওপর দিয়ে আগে থেকে এই চাবি শেয়ার করা কঠিন।
+
+#### HTTPS-এর হাইব্রিড সমাধান:
+- **হ্যান্ডশেক ফেজে (মাত্র কয়েক মিলি-সেকেন্ড):** Asymmetric Encryption (ECDHE) ব্যবহার করে নিরাপদে একটি এককালীন সিমেট্রিক চাবি (Session Key) তৈরি ও শেয়ার করা হয়।
+- **ডেটা ট্রান্সফার ফেজে (বাকি পুরো সময়):** উভয় প্রান্ত দ্রুতগতির Symmetric Encryption (AES-GCM) ব্যবহার করে জিগাবাইট ডেটা ফুল ওয়্যার-স্পিডে এনক্রিপ্ট ও ডিক্রিপ্ট করে।
+
+---
+
+### 3. Certificate Authority (CA) Chain of Trust ও X.509
+
+ব্রাউজার কীভাবে বিশ্বাস করে যে `google.com` আসলেই গুগলের সার্ভার?
+
+```
+[ Root CA (DigiCert / ISRG Root X1) ] ── (Hardcoded in Operating System / Chrome)
+               │ Signs
+               ▼
+[ Intermediate CA (Let's Encrypt R3) ]
+               │ Signs
+               ▼
+[ Server Certificate (*.google.com) ] ── (Sent to Browser during TLS Handshake)
+```
+
+- ব্রাউজার তার নিজস্ব ট্রাস্ট স্টোর (Trust Store)-এ থাকা বিশ্বস্ত রুট সিএ-র ডিজিটাল সিগনেচার যাচাই করতে করতে চেইন ধরে নিচে নেমে আসে। সিগনেচার মিলে গেলে ব্রাউজারের অ্যাড্রেসবারে সবুজ প্যাডলক (Lock Icon) জ্বলে ওঠে।
+
+---
+
+### 4. HSTS (HTTP Strict Transport Security)
+
+- একজন সাধারণ ব্যবহারকারী ব্রাউজারে কখনো `https://` টাইপ করেন না; তারা লেখেন `bank.com`।
+- ব্রাউজার ডিফল্টভাবে প্রথমে আন-এনক্রিপ্টেড `http://bank.com`-এ হিট করে, এবং সার্ভার রিডাইরেক্ট করে `https://bank.com`-এ পাঠায় (`301 Moved Permanently`)।
+- **ঝুঁকি (SSL Stripping Attack):** হ্যাকার এই প্রথম আন-এনক্রিপ্টেড রিডাইরেক্ট প্যাকেটটি হাইজ্যাক করে ব্যবহারকারীকে আজীবন ভুয়া HTTP পেজে আটকে রাখতে পারে।
+- **প্রতিরোধ (HSTS):** সার্ভার একটি বিশেষ রেসপন্স হেডার পাঠায়:
+  ```http
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  ```
+  ব্রাউজার এই হেডারটি দেখে মনে রাখে এবং পরবর্তী ১ বছর ব্যবহারকারী ভুল করে `http://` লিখলেও ব্রাউজার নেটওয়ার্কে কোনো প্যাকেট পাঠানোর আগেই ইন্টারনালি রিকোয়েস্টটিকে `https://`-এ রূপান্তর করে নেয়।
+- **HSTS Preload List:** বিশ্বখ্যাত ওয়েবসাইটগুলোর তালিকা ক্রোম ও ফায়ারফক্সের কোডে হার্ডকোডেড থাকে, ফলে জীবনের প্রথম কলেও কোনো আন-এনক্রিপ্টেড রিকোয়েস্ট পাঠানো অসম্ভব।
+
+---
+
+### 5. Certificate Revocation: CRL vs OCSP vs OCSP Stapling
+
+যদি কোনো সার্ভারের প্রাইভেট কী হ্যাক হয়ে যায়, তবে সেই সার্টিফিকেট মেয়াদ শেষ হওয়ার আগেই বাতিল (Revoke) করতে হয়:
+
+```
+Traditional OCSP (Privacy Nightmare & Latency):
+Browser ──(1) Connect to Web ──> Web Server
+Browser ──(2) DNS + TLS to CA ─> CA OCSP Server ("Is this cert revoked?")
+(CA knows every website the user visits! + Adds 200ms latency!)
+
+OCSP Stapling (Fast & Private):
+Web Server queries CA every 1 hour ──> Gets cryptographically signed OCSP proof
+Web Server ──(Sends Cert + Stapled Proof together!)──► Browser
+(Browser validates locally in zero extra network hops!)
+```
+
+---
+
+### 6. Alternatives & Security Evolution Comparison Matrix
+
+| বৈশিষ্ট্য | Plain HTTP | HTTPS (TLS 1.2) | HTTPS (TLS 1.3) |
 |---|---|---|---|
-| | | | |
+| **পোর্ট** | 80 | 443 | 443 |
+| **হ্যান্ডশেক RTT** | ০ (কোনো ক্রিপ্টো নেই) | **২ RTT** | **১ RTT (০-RTT রিজিউমে)** |
+| **ক্রিপ্টোগ্রাফিক অ্যালগরিদম** | কোনোটি নয় | পুরানো দুর্বল সাইফার (RSA, CBC) সমর্থিত | **কেবল নিরাপদ আধুনিক সাইফার (ECDHE, ChaCha20)** |
+| **ম্যান-ইন-দ্য-মিডল সুরক্ষা** | ❌ শূন্য | ✅ সম্পূর্ণ | ✅ সম্পূর্ণ |
+| **Forward Secrecy** | নেই | ঐচ্ছিক | **বাধ্যতামূলক** |
 
-### Failure modes
+---
 
-- Failure:
-- Detection:
-- Mitigation:
+### 7. Senior / Staff Engineer Interview Defense
 
-## Design questions
+> **ইন্টারভিউয়ার:** *"Forward Secrecy (বা Perfect Forward Secrecy - PFS) কী? এটি কেন আধুনিক HTTPS-এ অত্যন্ত গুরুত্বপূর্ণ এবং এটি কীভাবে কাজ করে?"*
+>
+> 💡 **Staff-Level উত্তরের কাঠামো:**
+> "Forward Secrecy হলো একটি অত্যন্ত গুরুত্বপূর্ণ ক্রিপ্টোগ্রাফিক গ্যারান্টি যা নিশ্চিত করে যে—ভবিষ্যতে কোনো সার্ভারের প্রাইভেট কী হ্যাকারদের হাতে চুরি হয়ে গেলেও, অতীতে রেকর্ড করে রাখা ট্রাফিক কোনো অবস্থাতেই ডিক্রিপ্ট করা যাবে না:
+> 1. **ঐতিহাসিক দুর্বলতা (Static RSA Key Exchange):** পুরানো আর্কিটেকচারে ক্লায়েন্ট সার্ভারের পাবলিক কী দিয়ে সেশন কী এনক্রিপ্ট করত। কোনো গোয়েন্দা সংস্থা যদি একটি ব্যাংকের ৫ বছরের এনক্রিপ্টেড ইন্টারনেট প্যাকেট ডিস্কে জমিয়ে রাখত, এবং ৫ বছর পর কোনোভাবে ব্যাংকের মাস্টার প্রাইভেট কী চুরি করতে পারত—তবে সে পূর্ববর্তী ৫ বছরের সমস্ত রেকর্ড করা ট্রাফিক নিমেষেই ডিক্রিপ্ট করে ফেলতে পারত!
+> 2. **PFS-এর সমাধান (Ephemeral Diffie-Hellman - ECDHE):** আধুনিক TLS 1.3-তে স্ট্যাটিক কি-এক্সচেঞ্জ সম্পূর্ণ নিষিদ্ধ। প্রতিটি একক সেশনের জন্য ক্লায়েন্ট এবং সার্ভার সম্পূর্ণ অস্থায়ী (Ephemeral) চাবি তৈরি করে যা মেমোরিতে মাত্র কয়েক মিনিটের জন্য থাকে এবং সেশন শেষ হওয়ার সাথে সাথে ধ্বংস করে ফেলা হয়।
+> 3. **ফলাফল:** মাস্টার সার্টিফিকেট কী চুরি হলেও অতীত বা ভবিষ্যতের কোনো ট্রাফিকের চাবি বের করা গাণিতিকভাবে অসম্ভব, কারণ প্রতিটি ট্রানজ্যাকশনের চাবি ছিল স্বতন্ত্র ও ক্ষণস্থায়ী।"
 
-1. What requirement makes HTTPS relevant?
-2. What changes at 10x traffic or data volume?
-3. What should be measured in production?
-4. What decision would make you replace this approach?
+---
 
-## Practice
+## 📝 Practice Questions
 
-Apply this topic to the exercise in the [Module 02 guide](../02-networking.md), then record the decision and its trade-offs.
+```markdown
+### Basic Practice Questions
+1. HTTPS-এর পূর্ণরূপ কী এবং এটি সাধারণ HTTP-র চেয়ে কীভাবে আলাদা?
+2. সিমেট্রিক এনক্রিপশন এবং অসিমেট্রিক এনক্রিপশনের মৌলিক পার্থক্য কী?
+3. কেন HTTPS সরাসরি অসিমেট্রিক এনক্রিপশন দিয়ে পুরো ডেটা এনক্রিপ্ট না করে হাইব্রিড মডেল ব্যবহার করে?
+4. Certificate Authority (CA) কী এবং এটি কীভাবে ওয়েবসাইটের সত্যতা প্রমাণ করে?
+5. সাধারণ ব্রাউজিংয়ে HTTP এবং HTTPS-এর ডিফল্ট পোর্ট নম্বর কত?
 
+### Intermediate Practice Questions
+6. HSTS (HTTP Strict Transport Security) কীভাবে SSL Stripping আক্রমণ প্রতিরোধ করে?
+7. HSTS Preload List কী এবং এতে ডোমেন তালিকাভুক্ত করার সুবিধা কী?
+8. OCSP Stapling কী এবং কেন এটি সনাতন CRL বা ডাইরেক্ট OCSP কুয়েরির চেয়ে অনেক দ্রুত ও নিরাপদ?
+9. SNI (Server Name Indication) কী এবং এটি কীভাবে একটি একক আইপি অ্যাড্রেসে শত শত আলাদা HTTPS সার্টিফিকেট হোস্ট করতে সাহায্য করে?
+10. Mixed Content ওয়ার্নিং ব্রাউজারে কেন দেখা দেয় এবং এটি কীভাবে দূর করা যায়?
+
+### Advanced / Staff-Level Questions
+11. Perfect Forward Secrecy (PFS) কীভাবে নিশ্চিত করে যে আজ সার্ভারের প্রাইভেট কী চুরি হলেও ৫ বছর আগের রেকর্ড করা ট্রাফিক ডিক্রিপ্ট করা যাবে না?
+12. mTLS (Mutual TLS) কী? সাধারণ একমুখী HTTPS-এর সাথে এর পার্থক্য কী এবং মাইক্রোসার্ভিস জিরো-ট্রাস্ট সিকিউরিটিতে এটি কীভাবে ব্যবহৃত হয়?
+13. SSL Offloading / Termination বনাম SSL Bridging বনাম SSL Passthrough—এন্টারপ্রাইজ লোড ব্যালেন্সারে কোন আর্কিটেকচার কখন বেছে নেবেন?
+14. Encrypted Client Hello (ECH / ESNI) কীভাবে ইন্টারনেট সার্ভিস প্রোভাইডার (ISP) বা জাতীয় সেন্সরশিপকে ব্যবহারকারী কোন ওয়েবসাইটে ভিজিট করছে তা স্নাইফ করা থেকে আটকায়?
+15. কোয়ান্টাম কম্পিউটার যখন বর্তমান RSA এবং ECC অ্যালগরিদম ভেঙে ফেলবে, তখন Post-Quantum Cryptography (PQC - যেমন Kyber/ML-KEM) কীভাবে আধুনিক HTTPS-এ ইন্টিগ্রেট করা হচ্ছে?
+```
+
+---
+
+## 🔑 Answer Key & Self-Test Evaluation
+
+<details>
+<summary>👉 <b>Answer Key ও সমাধান দেখতে এখানে ক্লিক করুন</b></summary>
+
+1. **সংজ্ঞা:** Hypertext Transfer Protocol Secure; সাধারণ HTTP যা TLS এনক্রিপশনের ভেতর দিয়ে চলে।
+2. **Symmetric vs Asymmetric:** Symmetric-এ এনক্রিপ্ট ও ডিক্রিপ্ট একই চাবি দিয়ে হয় (দ্রুত); Asymmetric-এ পাবলিক কী দিয়ে এনক্রিপ্ট ও প্রাইভেট কী দিয়ে ডিক্রিপ্ট হয় (নিরাপদ কিন্তু ধীর)।
+3. **হাইব্রিড মডেল:** অসিমেট্রিক ক্রিপ্টোগ্রাফি সিপিইউ-এর জন্য অতিরিক্ত ব্যয়বহুল; তাই শুধু সেশন কি এক্সচেঞ্জ করতে এটি ব্যবহৃত হয় এবং বাল্ক ডেটা দ্রুত সিমেট্রিকে চলে।
+4. **CA-র কাজ:** বিশ্বস্ত ডিজিটাল সার্টিফিকেট প্রদানকারী কর্তৃপক্ষ যা সার্ভারের পরিচয় ও পাবলিক কী ডিজিটাল সিগনেচার দিয়ে সিল করে দেয়।
+5. **পোর্টস:** HTTP পোর্ট 80; HTTPS পোর্ট 443।
+6. **SSL Stripping রোধ:** আক্রমণকারী যেন ক্লায়েন্টকে এইচটিটিপি রিডাইরেক্টে আটকাতে না পারে, ব্রাউজারকে বাধ্য করা সর্বদা শুধুমাত্র HTTPS-এ সংযোগ করতে।
+7. **HSTS Preload:** ব্রাউজারের মূল কোডবেসে ডোমেন সেভ থাকা, ফলে জীবনের প্রথম কলেও কোনো আন-এনক্রিপ্টেড প্যাকেট ওয়্যারে বের হয় না।
+8. **OCSP Stapling:** সার্ভার নিজেই সিএ থেকে প্রতি ঘণ্টায় সাইনড ভ্যালিডিটি স্ট্যাম্প এনে ক্যাশ করে এবং ক্লায়েন্টকে এক সাথে দেয়; ক্লায়েন্টকে আলাদা সিএ-তে পিং করতে হয় না (প্রাইভেসি ও স্পিড রক্ষা)।
+9. **SNI:** টিএলএস হ্যান্ডশেকের শুরুতেই ক্লায়েন্ট জানায় সে কোন হোস্টনেমে ঢুকতে চায়, ফলে একই আইপিতে থাকা হাজার হাজার ভার্চুয়াল হোস্টের মধ্যে সার্ভার সঠিক সার্টিফিকেটটি রিটার্ন করতে পারে।
+10. **Mixed Content:** একটি HTTPS পেজের ভেতর যদি কোনো ছবি বা স্ক্রিপ্ট সাধারণ অসুরক্ষিত `http://` লিঙ্ক থেকে লোড হয়। সমাধান: সমস্ত এসেট আপেক্ষিক পাথ বা HTTPS পাথে লোড করা।
+11. **Forward Secrecy:** Ephemeral Diffie-Hellman (ECDHE) চাবি ব্যবহার করা যা প্রতি সেশনে নতুন তৈরি হয় এবং সেশন শেষে মেমোরি থেকে মুছে যায়, ফলে পুরোনো মাস্টার কী পেলেও ডিক্রিপ্ট করা যায় না।
+12. **mTLS:** সাধারণ HTTPS-এ শুধু ক্লায়েন্ট সার্ভারের সত্যতা যাচাই করে; mTLS-এ সার্ভারও ক্লায়েন্টের ক্রিপ্টোগ্রাফিক সার্টিফিকেট যাচাই করে (সার্ভিস মেশ ও জিরো-ট্রাস্টের ভিত্তি)।
+13. **Offload vs Pass vs Bridge:** Offloading লোড ব্যালেন্সারে ডিক্রিপ্ট করে ব্যাকএন্ডে সাধারণ পাঠায় (কম সিপিইউ); Passthrough ব্যাকএন্ড পর্যন্ত এনক্রিপ্টেড রাখে; Bridging প্রক্সিতে ডিক্রিপ্ট করে আবার নতুন সার্টিফিকেট দিয়ে ব্যাকএন্ডে এনক্রিপ্ট করে পাঠায়।
+14. **Encrypted Client Hello (ECH):** SNI হেডার আগে প্লেইন টেক্সটে যেত বলে আইএসপি দেখত ইউজার কোন সাইটে ঢুকছে। ECH সম্পূর্ণ হ্যান্ডশেককে পাবলিক কী দিয়ে এনক্রিপ্ট করে আইএসপির চোখ বন্ধ করে দেয়।
+15. **Post-Quantum TLS:** ল্যাটিস-বেসড ক্রিপ্টোগ্রাফি (যেমন ML-KEM / Kyber) প্রচলিত ECDHE-র সাথে হাইব্রিড আকারে যুক্ত করা হচ্ছে, যাতে ভবিষ্যতে কোয়ান্টাম ডিক্রিপশন প্রতিহত করা যায়।
+
+</details>

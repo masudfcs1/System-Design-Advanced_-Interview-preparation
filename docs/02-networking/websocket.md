@@ -1,41 +1,180 @@
-# WebSocket
+# WebSocket Protocol
 
-[Back to Networking topics](README.md) | [Module guide](../02-networking.md)
+[Back to Networking topics](README.md) · [Module guide](../02-networking.md)
 
-## Learning checklist
+## 📌 Learning Checklist
+- [ ] Understand the WebSocket architecture (RFC 6455) and HTTP Upgrade handshake.
+- [ ] Contrast Full-Duplex Bi-directional streaming with Half-Duplex HTTP Request-Response.
+- [ ] Master WebSocket Framing Layer, Masking Keys, and Control Frames (Ping/Pong/Close).
+- [ ] Scale Stateful WebSocket clusters horizontally using Redis Pub/Sub, Kafka, or Message Brokers.
+- [ ] Contrast WebSocket with Polling, Long-Polling, and Server-Sent Events (SSE).
+- [ ] Defend 1M+ concurrent WebSocket connections, heartbeats, and connection draining in Staff-level interviews.
 
-- [ ] Explain WebSocket in your own words.
-- [ ] Identify when it is useful and when it is a poor fit.
-- [ ] Compare its main alternatives and trade-offs.
-- [ ] Describe one failure mode and a mitigation.
-- [ ] Apply it to a realistic system-design scenario.
+---
 
-## Notes
+## 📖 Deep Dive Notes
 
-### Core idea
+### 1. সহজ সংজ্ঞা ও Intuitive Mental Model
 
-Write the definition, purpose, and operating model here.
+**WebSocket (RFC 6455)** হলো একটি অত্যন্ত হালকা, দ্বি-মুখী (Bi-directional), সার্বক্ষণিক সংযুক্ত (Persistent), এবং ফুল-ডুপ্লেক্স (Full-Duplex) প্রোটোকল যা একটি একক দীর্ঘস্থায়ী TCP কানেকশনের মাধ্যমে ব্রাউজার ও সার্ভারকে যেকোনো মুহূর্তে শূন্য ল্যাটেন্সিতে একে অপরকে ডেটা ফ্রেম পুশ করার সুযোগ দেয়।
 
-### Trade-offs
+এটি প্রথাগত HTTP রিকোয়েস্ট-রেসপন্স মডেলের সীমাবদ্ধতা সম্পূর্ণ ভেঙে ফেলে।
 
-| Best when | Benefits | Costs and risks | Alternatives |
-|---|---|---|---|
-| | | | |
+```
+HTTP Polling (Wasteful & Slow):
+Client ─── (GET /updates?) ───► Server (No updates)
+Client ─── (GET /updates?) ───► Server (No updates)
+Client ─── (GET /updates?) ───► Server (1 new msg!)
 
-### Failure modes
+WebSocket (Instant & Full-Duplex):
+Client ─── HTTP Upgrade Handshake ───► Server (Connection ESTABLISHED!)
+Client ◄══════ Real-time Stream ══════► Server
+(সার্ভার বা ক্লায়েন্ট যেকোনো মুহূর্তে কোনো পূর্ব নোটিশ ছাড়াই ডেটা পাঠাতে পারে!)
+```
 
-- Failure:
-- Detection:
-- Mitigation:
+> 🧠 **Intuitive Mental Model (ফোন কল বনাম চিঠি আদান-প্রদান):**
+> - **HTTP Polling (চিঠি আদান-প্রদান):** আপনি ডাকপিয়নকে প্রতি ৫ মিনিট পর পর পোস্ট অফিসে পাঠান: "আমার কোনো চিঠি আছে?" পোস্ট অফিস বলে "না"। ৫ মিনিট পর আবার পাঠান: "কোনো চিঠি আছে?"—এভাবে অজস্র কাগজ, জ্বালানি ও সময় নষ্ট হয়।
+> - **WebSocket (সরাসরি ফোন কল):** আপনি বন্ধুর নম্বরে কল করলেন। বন্ধু ফোন তুলল এবং দুজনের মধ্যে একটি স্থায়ী অডিও লাইন কানেক্ট হয়ে গেল (**Persistent TCP Socket**)। এবার লাইন না কেটে ঘণ্টার পর ঘণ্টা দুজন একই সাথে কথা বলতে ও শুনতে পারেন (**Full-Duplex**)। যখনই বন্ধুর মনে কোনো কথা আসে সে সাথে সাথে মুখে বলে, আপনাকে আলাদা করে প্রশ্ন করতে হয় না!
 
-## Design questions
+---
 
-1. What requirement makes WebSocket relevant?
-2. What changes at 10x traffic or data volume?
-3. What should be measured in production?
-4. What decision would make you replace this approach?
+### 2. The WebSocket Upgrade Handshake
 
-## Practice
+একটি ওয়েবপেইজ সরাসরি টিসিপি সকেট খুলতে পারে না (ব্রাউজার সিকিউরিটির কারণে)। তাই WebSocket একটি সাধারণ HTTP/1.1 রিকোয়েস্ট হিসেবে জন্ম নেয় এবং নিমেষেই প্রোটোকল পরিবর্তন করে:
 
-Apply this topic to the exercise in the [Module 02 guide](../02-networking.md), then record the decision and its trade-offs.
+```http
+[ Client Request ]
+GET /chat HTTP/1.1
+Host: server.example.com
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+Sec-WebSocket-Version: 13
 
+[ Server Response ]
+HTTP/1.1 101 Switching Protocols
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
+```
+
+- স্ট্যাটাস **`101 Switching Protocols`** পাওয়ার সাথে সাথে আন্ডারলাইং TCP কানেকশনটি আর HTTP থাকে না; এটি তাৎক্ষণিকভাবে বাইনারি **WebSocket প্রোটোকলে সুইচ করে**।
+- এর পর থেকে প্রতি মেসেজে কোনো বিশাল HTTP হেডার, কুকি বা মেটাডাটা পাঠানো লাগে না; মাত্র **২ থেকে ১০ বাইটের ফ্রেম হেডারে** ডেটা আদান-প্রদান হয়!
+
+---
+
+### 3. Horizontal Scaling: Distributed WebSocket Architecture
+
+ওয়েব সার্ভারগুলো সাধারণ ওয়েবে স্ট্যাটলেস হলেও WebSocket সার্ভারগুলো স্বভাবগতভাবেই **Stateful** (কানেকশন মেমোরিতে ধরে রাখে)। 
+যদি ইউজার A নোড ১-এ কানেক্ট থাকে এবং ইউজার B নোড ৩-এ কানেক্ট থাকে, তবে তারা একে অপরের সাথে চ্যাট করবে কীভাবে?
+
+```
+[ Client A ] ──────────────────────┐                 ┌────────────────────── [ Client B ]
+     │                             ▼                 ▼                              │
+     │                     ┌───────────────────────────────┐                        │
+     │                     │   Layer 4 Load Balancer /     │                        │
+     │                     │   Layer 7 Reverse Proxy (NLB) │                        │
+     │                     └───────┬───────────────┬───────┘                        │
+     │                             │               │                                │
+     ▼                             ▼               ▼                                ▼
+[ WebSocket Pod 1 ]         [ WebSocket Pod 2 ] [ WebSocket Pod 3 ]         [ WebSocket Pod 4 ]
+ (Holds Socket for A)                                                        (Holds Socket for B)
+     │                                                     ▲
+     │ (Publish: {to: "B", msg: "Hi"})                     │ (Receives event for B)
+     ▼                                                     │
+ ┌─────────────────────────────────────────────────────────┴────────────────────────┐
+ │            Central Message Backbone (Redis Cluster Pub/Sub / Kafka)              │
+ └──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Redis Pub/Sub বা NATS:** ইউজার A মেসেজ পাঠালে Pod 1 মেসেজটি Redis চ্যানেলে পাবলিশ করে: `PUBLISH user:B '{"msg": "Hi"}'`।
+2. সমস্ত পড এই ব্যাকবোন সাবস্ক্রাইব করে রাখে। Pod 3 দেখে যে ইউজার B তার লোকাল মেমোরিতে কানেক্টেড আছে; সে সাথে সাথে মেসেজটি ইউজার B-এর লাইভ সকেটে পুশ করে দেয়।
+
+---
+
+### 4. Alternatives Comparison: Polling vs Long-Polling vs SSE vs WebSocket
+
+| মেট্রিক | Short Polling | Long Polling | Server-Sent Events (SSE) | WebSocket |
+|---|---|---|---|---|
+| **কানেকশন মডেল** | বারবার নতুন রিকোয়েস্ট | সার্ভার অপেক্ষা করে রেসপন্স দেয় | লং-লিভড সিঙ্গল HTTP স্ট্রিম | **লং-লিভড ফুল-ডুপ্লেক্স টিসিপি** |
+| **দিকনির্মুখিতা** | ক্লায়েন্ট $\rightarrow$ সার্ভার | ক্লায়েন্ট $\rightarrow$ সার্ভার | সার্ভার $\rightarrow$ ক্লায়েন্ট (একমুখী) | **উভয়মুখী (Bi-directional)** |
+| **হেডার ওভারহেড** | বিশাল (প্রতি কলে ১ কেবি) | বিশাল (প্রতি মেসেজে ১ কেবি) | অতি সামান্য | **ন্যূনতম (২ থেকে ৬ বাইট)** |
+| **ফায়ারওয়াল ফ্রেন্ডলি** | ১০০% | ১০০% | ১০০% (HTTP/2 নেটিভ) | কিছু করপোরেট প্রক্সিতে ব্লক হয় |
+| **আদর্শ ব্যবহার** | কোনো কাজের নয় | পুরানো লিগ্যাসি ব্রাউজার | স্টক টিকার, AI চ্যাট স্ট্রিমিং | **মাল্টিপ্লেয়ার গেম, লাইভ চ্যাট** |
+
+---
+
+### 5. Failure Modes & Production Mitigations
+
+#### Failure Mode 1: Silent Half-Open Sockets (Zombie Connections)
+- **ঝুঁকি:** ইউজার মোবাইলে ইন্টারনেট বন্ধ করে দিল বা সুরঙ্গে ঢুকল। টিসিপি কোনো FIN প্যাকেট না পাঠিয়ে সাইলেন্টলি ড্রপ করল। সার্ভার ভাবে ক্লায়েন্ট এখনো লাইভ আছে এবং মেমোরিতে সকেট ধরে রাখে। ফলে কয়েক ঘণ্টায় সার্ভার লক্ষ লক্ষ ডেড সকেটে মেমোরি ফুল করে ক্র্যাশ করে।
+- **প্রতিরোধ (Mitigation):** **Heartbeat Ping/Pong:** সার্ভার প্রতি ৩০ সেকেন্ডে একটি `Ping` ফ্রেম পাঠাবে। ক্লায়েন্ট ১৫ সেকেন্ডে `Pong` ফেরত না দিলে সার্ভার সকেটটিকে ফোর্সফুলি টার্মিনেট করবে।
+
+#### Failure Mode 2: The Reconnection Storm on Deploy
+- **ঝুঁকি:** কুবারনেটিসে নতুন ভার্সন ডিপ্লয় করার সময় পুরোনো পড কিল হওয়ার সাথে সাথে ১ লাখ ক্লায়েন্ট এক সেকেন্ডে নতুন পডে রি-কানেক্ট হতে হ্যান্ডশেক ফ্লাড তৈরি করে।
+- **প্রতিরোধ:** **Exponential Backoff with Full Jitter** ক্লায়েন্ট লাইব্রেরিতে বাধ্যতামূলক করা এবং সার্ভারে **Connection Draining (ধীরে ধীরে সকেট শাটডাউন)** প্রয়োগ করা।
+
+---
+
+### 6. Senior / Staff Engineer Interview Defense
+
+> **ইন্টারভিউয়ার:** *"১ মিলিয়ন কনকারেন্ট লাইভ WebSocket কানেকশন একটি একক নোডে (বা ক্ষুদ্র ক্লাস্টারে) হ্যান্ডেল করতে ওএস কার্নেল ও আর্কিটেকচারে কী কী বটলনেক ভাঙতে হয়?"*
+>
+> 💡 **Staff-Level উত্তরের কাঠামো:**
+> "১০ লাখ কনকারেন্ট সকেট হ্যান্ডেল করা একটি বিখ্যাত সিস্টেম ডিজাইন চ্যালেঞ্জ (The C10M Problem)। এটি সফলভাবে অর্জন করতে ৪টি স্তরে টিউনিং করতে হবে:
+> 1. **File Descriptors Limit (FD):** লিনাক্সে প্রতিটি সকেট একটি ফাইল ডিস্ক্রিপ্টর। ডিফল্ট লিমিট ১০২৪। আমাদের ওএস কনফিগারেশনে `sysctl` দিয়ে `fs.file-max = 2097152` এবং `/etc/security/limits.conf`-এ `nofile` ২০ লাখ সেট করতে হবে।
+> 2. **Epoll Event-Loop Architecture:** জাভা থ্রেড-প্রতি-কানেকশন মডেল চালালে ১০ লাখ থ্রেডের জন্য ২ টেরাবাইট র‍্যাম শুধু স্ট্যাক মেমোরিতেই লেগে যাবে! আমরা **Non-blocking Event-driven I/O** (যেমন Go Goroutines, Node.js libuv, বা Netty Epoll) ব্যবহার করব, যা একটিমাত্র কোর দিয়ে হাজার হাজার নিষ্ক্রিয় সকেট ড্রাইভ করতে পারে।
+> 3. **TCP Memory Buffer Tuning:** ডিফল্ট টিসিপি রিড/রাইট বাফার থাকে ১২৮ কেবি থেকে ৪ এমবি। ১০ লাখ সকেটে এটি কয়েক টেরাবাইট মেমোরি খাবে। যেহেতু চ্যাট মেসেজ ছোট, আমরা `net.ipv4.tcp_rmem` এবং `tcp_wmem`-এর মিনিমাম বাফার সাইজ কমিয়ে **৪ থেকে ৮ কেবি** করে দেব। এতে প্রতিটি সকেট মাত্র ১০-১৫ কেবি র‍্যাম দখল করবে—ফলে পুরো ১০ লাখ কানেকশন মাত্র **১৬ জিবি র‍্যামের একটি একক মেশিনে** অনায়াসে এঁটে যাবে!
+> 4. **Epoll Socket Keep-Alive:** কার্নেল লেভেলে `SO_REUSEPORT` এবং অ্যাপ্লিকেশন লেভেলে ৩০ সেকেন্ডের পিং/পং হার্টবিট দিয়ে ডেড সকেট নিয়মিত মেমোরি থেকে পরিষ্কার করব।"
+
+---
+
+## 📝 Practice Questions
+
+```markdown
+### Basic Practice Questions
+1. WebSocket কী এবং এটি সাধারণ HTTP-র চেয়ে কোন দিক থেকে সম্পূর্ণ আলাদা?
+2. HTTP Upgrade Handshake কীভাবে একটি সাধারণ এইচটিটিপি কানেকশনকে ওয়েবসকেটে রূপান্তর করে?
+3. WebSocket ফ্রেমে Ping এবং Pong কন্ট্রোল ফ্রেমের কাজ কী?
+4. কেন মোবাইল বা ওয়েব অ্যাপে চ্যাটের জন্য Polling-এর বদলে WebSocket ব্যবহার করা হয়?
+5. WebSocket কানেকশন কি TCP-র ওপর চলে নাকি UDP-র ওপর?
+
+### Intermediate Practice Questions
+6. অনুভূমিকভাবে স্কেলিং (Horizontal Scaling) করার সময় একাধিক ওয়েবপডের মধ্যে WebSocket ট্রাফিক কীভাবে Redis Pub/Sub বা কাফকা দিয়ে সিঙ্ক করবেন?
+7. সাইলেন্ট হাফ-ওপেন (Half-Open) সকেট কী এবং হার্টবিট মেকানিজম কীভাবে এটি প্রতিরোধ করে?
+8. লোড ব্যালেন্সার লেভেলে WebSocket দীর্ঘস্থায়ী কানেকশন হ্যান্ডেল করতে Connection Timeout কীভাবে কনফিগার করবেন?
+9. WebSocket ফ্রেম লেভেলে ক্লায়েন্ট-টু-সার্ভার ডেটা কেন সর্বদা ৪-বাইটের মাস্কিং কি (Masking Key) দিয়ে মাস্ক করা বাধ্যতামূলক?
+10. Server-Sent Events (SSE) কখন WebSocket-এর চেয়ে ভালো স্থাপত্যিক বিকল্প?
+
+### Advanced / Staff-Level Questions
+11. লিনাক্স কার্নেলে ফাইল ডিস্ক্রিপ্টর এবং টিসিপি মেমোরি বাফার (`tcp_rmem`/`tcp_wmem`) টিউন করে কীভাবে একটি একক নোডে ১ মিলিয়ন (1M) লাইভ সকেট হ্যান্ডেল করবেন?
+12. ব্লু-গ্রিন বা রোলিং ডিপ্লয়মেন্টের সময় লাখ লাখ চলমান লাইভ ওয়েবসকেট কানেকশন ড্রপ না করে কীভাবে জিরো-ডাউনটাইম কানেকশন ড্রেনিং (Connection Draining) ডিজাইন করবেন?
+13. রিকানেকশন স্টর্ম (Reconnection Storm): একটি পড ক্র্যাশ করলে ১ লাখ সকেট একসাথে দ্বিতীয় পডে রি-কানেক্ট হয়ে যেন ক্যাসকেডিং ফেইলিউর না ঘটায়, তার ক্লায়েন্ট-সাইড ব্যাকঅফ আর্কিটেকচার কী?
+14. WebSocket over HTTP/2 (RFC 8441) কীভাবে কাজ করে এবং এটি কীভাবে একক টিসিপি সকেটের ওপর ওয়েবসকেট ও সাধারণ এপিআই ট্রাফিককে মাল্টিপ্লেক্স করে?
+15. এন্ড-টু-এন্ড সিকিউরিটিতে WebSocket-এর মাধ্যমে সিএসআরএফ (Cross-Site WebSocket Hijacking - CSWSH) আক্রমণ কীভাবে ঘটে এবং `Origin` হেডার যাচাই করে কীভাবে এটি প্রতিরোধ করবেন?
+```
+
+---
+
+## 🔑 Answer Key & Self-Test Evaluation
+
+<details>
+<summary>👉 <b>Answer Key ও সমাধান দেখতে এখানে ক্লিক করুন</b></summary>
+
+1. **সংজ্ঞা:** ফুল-ডুপ্লেক্স দ্বিমুখী দীর্ঘস্থায়ী প্রোটোকল যাতে সার্ভার ও ক্লায়েন্ট যেকোনো মুহূর্তে কোনো রিকোয়েস্ট ছাড়াই ডেটা পুশ করতে পারে।
+2. **Upgrade Handshake:** ক্লায়েন্ট `Upgrade: websocket` এবং `Sec-WebSocket-Key` পাঠায়; সার্ভার `101 Switching Protocols` দিয়ে সকেটটিকে ওয়েবসকেটে পরিণত করে।
+3. **Ping/Pong:** কানেকশন জীবিত আছে কিনা যাচাই করার জন্য হার্টবিট সিগন্যাল; কোনো ডেটা আদান-প্রদান না হলেও সকেট ওপেন রাখে।
+4. **Polling পরিহার:** পোলিংয়ে হাজার হাজার ফাঁকা রিকোয়েস্টে প্রচুর ব্যান্ডউইথ ও ব্যাটারি নষ্ট হয়; ওয়েবসকেটে কেবল নতুন ইভেন্ট আসলেই ট্রাফিক যায়।
+5. **আন্ডারলাইং ট্রান্সপোর্ট:** এটি নির্ভরযোগ্য ও সাজানো TCP স্ট্রিমের ওপর চলে।
+6. **Redis Pub/Sub Scaling:** পডগুলো লোকাল সকেট রাখে। মেসেজ এলে রেডিস চ্যানেলে পুশ করে; অন্য পড সাবস্ক্রাইব করে তার লোকাল ক্লায়েন্টকে ফরওয়ার্ড করে।
+7. **Half-Open Socket:** ক্লায়েন্ট হুট করে সংযোগ বিচ্ছিন্ন করলে ওএস জানে না। পিং পাঠিয়ে রেসপন্স না পেলে ডেড সকেট মেমোরি থেকে ড্রপ করা হয়।
+8. **LB Timeout:** সাধারণ ৬০ সেকেন্ডের টাইমআউট তুলে দিয়ে ওয়েবসকেট পাথে আইডল টাইমআউট ১ ঘণ্টা বা সারাদিন করে রাখা এবং নিয়মিত পিং পাঠানো।
+9. **Masking Key:** পুরনো ক্যাশিং প্রক্সি যাতে ভেতরের পেলোড দেখে কোনো ভুয়া বিষাক্ত রিকোয়েস্ট (Cache Poisoning) মনে না করে, তাই ক্লায়েন্ট র্যান্ডম XOR মাস্ক দিয়ে ফ্রেম পাঠায়।
+10. **SSE শ্রেষ্ঠত্ব:** যখন ডেটা শুধু সার্ভার থেকে ক্লায়েন্টে আসে (যেমন স্টক রেট বা AI চ্যাট রেসপন্স) এবং ক্লায়েন্ট থেকে কোনো ডেটা পাঠানোর দরকার নেই।
+11. **1M Sockets Tuning:** `nofile` সীমা ২০ লাখে নেওয়া, নন-ব্লকিং Epoll ব্যবহার এবং টিসিপি রিড/রাইট বাফার কমিয়ে ৪ কেবি করা যাতে র‍্যাম সাশ্রয় হয়।
+12. **Graceful Draining:** পডকে সিগটার্ম দিলে নতুন কানেকশন বন্ধ করা এবং বিদ্যমান সকেটগুলোকে র্যান্ডম বিরতিতে (জিটার সহ) ৫ মিনিটের মধ্যে রিকানেক্ট হতে বলে একে একে শাটডাউন করা।
+13. **Reconnection Storm Defense:** ক্লায়েন্টে Full Jitter সহ এক্সপোনেনশিয়াল ব্যাকঅফ রাখা যাতে ১ লাখ সকেট একবারে না এসে ৫ মিনিট জুড়ে ছড়িয়ে ছিটিয়ে রিকানেক্ট করে।
+14. **WebSocket over H2:** সাধারণ ওয়েবসকেট আলাদা টিসিপি কানেকশন নেয়; RFC 8441 বিদ্যমান HTTP/2 কানেকশনের একটি একক স্ট্রিমে ওয়েবসকেট টানেল চালায়।
+15. **CSWSH Defense:** আক্রমণকারী থার্ড-পার্টি সাইট থেকে গোপনে ইউজারের অথেনটিকেটেড সকেট খুলতে পারে। সমাধান: হ্যান্ডশেকে সার্ভার কঠোরভাবে `Origin` হেডার ভ্যালিডেট করবে।
+
+</details>

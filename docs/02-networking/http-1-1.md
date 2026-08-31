@@ -1,41 +1,161 @@
-# HTTP/1.1
+# HTTP/1.1 Protocol
 
-[Back to Networking topics](README.md) | [Module guide](../02-networking.md)
+[Back to Networking topics](README.md) · [Module guide](../02-networking.md)
 
-## Learning checklist
+## 📌 Learning Checklist
+- [ ] Understand HTTP/1.1 (RFC 2616 / RFC 7230) architecture and text-based framing.
+- [ ] Learn Persistent Connections (HTTP Keep-Alive) and its latency impact over HTTP/1.0.
+- [ ] Analyze HTTP Pipelining and why it fundamentally failed due to Application Head-of-Line Blocking.
+- [ ] Understand Chunked Transfer Encoding for dynamic and streaming payloads.
+- [ ] Contrast browser connection limits (Domain Sharding workaround).
+- [ ] Defend legacy HTTP/1.1 tuning and modern migration paths in Staff-level interviews.
 
-- [ ] Explain HTTP/1.1 in your own words.
-- [ ] Identify when it is useful and when it is a poor fit.
-- [ ] Compare its main alternatives and trade-offs.
-- [ ] Describe one failure mode and a mitigation.
-- [ ] Apply it to a realistic system-design scenario.
+---
 
-## Notes
+## 📖 Deep Dive Notes
 
-### Core idea
+### 1. সহজ সংজ্ঞা ও Intuitive Mental Model
 
-Write the definition, purpose, and operating model here.
+১৯৯৭ সালে প্রবর্তিত **HTTP/1.1** হলো ওয়ার্ল্ড ওয়াইড ওয়েবের ইতিহাসের সবচেয়ে প্রভাবশালী এবং দীর্ঘস্থায়ী অ্যাপ্লিকেশন লেয়ার প্রোটোকল। এটি একটি প্লেইন টেক্সট-ভিত্তিক (Plain-text), রিকোয়েস্ট-রেসপন্স আর্কিটেকচার যা ব্রাউজার এবং ওয়েব সার্ভারের মধ্যে হাইপারটেক্সট, ইমেজ এবং API ডেটা আদান-প্রদান করে।
 
-### Trade-offs
+HTTP/1.0-এর তুলনায় এর সবচেয়ে বৈপ্লবিক উন্নতি ছিল **Persistent Connections (HTTP Keep-Alive)**—একটি একক TCP কানেকশনকে একাধিক রিকোয়েস্ট-রেসপন্স সাইকেলে পুনরায় ব্যবহার (Reuse) করার ক্ষমতা।
 
-| Best when | Benefits | Costs and risks | Alternatives |
+```
+HTTP/1.0 (No Keep-Alive):
+[ Client ] ─── TCP Handshake ───> [ Server ]
+[ Client ] ─── GET /index.html ─> [ Server ]
+[ Client ] <── 200 OK ────────── [ Server ] ─── Connection CLOSED!
+[ Client ] ─── TCP Handshake ───> [ Server ] (New TCP connection for style.css!)
+
+HTTP/1.1 (Keep-Alive Default):
+[ Client ] ─── TCP Handshake ───> [ Server ]
+[ Client ] ─── GET /index.html ─> [ Server ]
+[ Client ] <── 200 OK ────────── [ Server ] (Connection KEPT OPEN!)
+[ Client ] ─── GET /style.css ──> [ Server ]
+[ Client ] <── 200 OK ────────── [ Server ]
+```
+
+> 🧠 **Intuitive Mental Model (একক ডেলিভারি বয় বনাম প্রতি আইটেমে নতুন রাইডার):**
+> আপনি একটি রেস্তোরাঁ থেকে বার্গার, ফ্রাই ও কোক অর্ডার করেছেন।
+> - **HTTP/1.0:** ১ম রাইডার এসে বার্গার দিয়ে চলে গেল। ২য় রাইডার এসে ফ্রাই দিয়ে চলে গেল। ৩য় রাইডার এসে কোক দিয়ে চলে গেল। প্রতিটি অর্ডারে নতুন করে রাস্তায় যাতায়াতের সময় নষ্ট হলো (**Huge TCP handshake overhead**)।
+> - **HTTP/1.1:** একজনই রাইডার এসে দাঁড়াল। আপনি বললেন "বার্গার দিন", সে দিল। আপনি বললেন "ফ্রাই দিন", সে সাথে সাথে দিল। আপনি বললেন "কোক দিন", সে দিল (**Keep-Alive reuse**)। 
+> কিন্তু সমস্যা হলো—সে ব্যাগে হাত দিয়ে বার্গার বের না করা পর্যন্ত ফ্রাই বের করতে পারবে না (**Application Head-of-Line Blocking**)!
+
+---
+
+### 2. HTTP Pipelining এবং এর ঐতিহাসিক ব্যর্থতা
+
+HTTP/1.1 স্পেসিফিকেশনে ল্যাটেন্সি কমানোর জন্য **HTTP Pipelining** নামক একটি ফিচার আনা হয়েছিল:
+- ক্লায়েন্ট ১ম রিকোয়েস্টের রেসপন্স পাওয়ার আগেই পর পর ২য় ও ৩য় রিকোয়েস্ট পাঠিয়ে দিতে পারবে।
+- **কেন এটি ব্যর্থ হলো? (Application-Level Head-of-Line Blocking):**
+  - সার্ভারকে অবশ্যই রিকোয়েস্টের ক্রমানুসারেই (`Req 1 -> Req 2 -> Req 3`) রেসপন্স ফেরত পাঠাতে হতো।
+  - যদি ১ম রিকোয়েস্টটি একটি অত্যন্ত জটিল ও স্লো ডাটাবেজ কুয়েরি হয় যা শেষ হতে ৫ সেকেন্ড নেয়, তবে ২য় রিকোয়েস্টটি মাত্র ১ মিলিসেকেন্ডের স্ট্যাটিক ইমেজ হওয়া সত্ত্বেও সার্ভারকে ৫ সেকেন্ড অপেক্ষা করতে হতো!
+  - ইন্টারনেটের প্রচুর বাগী প্রক্সি এবং অ্যান্টিভাইরাস পাইপলাইনিংয়ে কনফিউজড হয়ে ডেটা করাপ্ট করত। ফলে আধুনিক সমস্ত ব্রাউজার (Chrome, Firefox) ডিফল্টভাবেই পাইপলাইনিং চিরতরে বন্ধ (Disable) করে দেয়।
+
+---
+
+### 3. Chunked Transfer Encoding
+
+- সনাতন HTTP-তে সার্ভারকে রেসপন্সের শুরুতে অবশ্যই `Content-Length: <bytes>` হেডার জানাতে হতো, যাতে ক্লায়েন্ট জানে বডি কোথায় শেষ।
+- কিন্তু ডাইনামিক ডেটাতে (যেমন: দীর্ঘ ডাটাবেজ স্ট্রিম বা লাইভ এইচটিএমএল) সার্ভার আগে থেকে মোট সাইজ জানে না। পুরো ডেটা জেনারেট হওয়ার জন্য বসে থাকলে মেমোরি শেষ হয় এবং ফার্স্ট-বাইট ল্যাটেন্সি বাড়ে।
+- **সমাধান:** `Transfer-Encoding: chunked`
+  - সার্ভার ডেটা ছোট ছোট ব্লকে পাঠায়: `[হেক্সাডেসিমেল সাইজ][CRLF][ডেটা][CRLF]`।
+  - যখন সমস্ত ডেটা পাঠানো শেষ হয়, সার্ভার একটি বিশেষ `0` (Zero-length chunk) পাঠিয়ে রেসপন্স শেষ করে।
+
+---
+
+### 4. Browser Connection Limit & The Workaround: Domain Sharding
+
+- যেহেতু একটি টিসিপি কানেকশনে একই সাথে মাত্র একটি রিকোয়েস্ট প্রসেস হতে পারে, তাই ওয়েবপেজের ১০০টি ফাইল দ্রুত লোড করতে ব্রাউজার একটি একক ডোমেইনের জন্য সমান্তরালভাবে **সর্বোচ্চ ৬টি টিসিপি কানেকশন (Browser 6-connection limit)** ওপেন করে।
+- **Domain Sharding হ্যাক:**
+  - ওয়েব ইঞ্জিনিয়াররা স্ট্যাটিক এসেটগুলোকে একাধিক ভিন্ন ভিন্ন সাবডোমেনে ভাগ করে দিতেন:
+    `static1.example.com`, `static2.example.com`, `static3.example.com`।
+  - ব্রাউজার এদেরকে আলাদা ডোমেন ভেবে প্রতিটিতে ৬টি করে মোট ১৮টি বা ২৪টি টিসিপি কানেকশন খুলে সমান্তরাল ডাউনলোড করত (যদিও এটি সার্ভারে প্রচুর টিসিপি ও মেমোরি প্রেসার তৈরি করত)।
+
+---
+
+### 5. Alternatives & Evolution Comparison Matrix
+
+| বৈশিষ্ট্য | HTTP/1.0 | HTTP/1.1 | HTTP/2 |
 |---|---|---|---|
-| | | | |
+| **কানেকশন স্থায়িত্ব** | ক্লোজড বাই ডিফল্ট | **Keep-Alive বাই ডিফল্ট** | লং-লিভড একক কানেকশন |
+| **ফরম্যাট** | প্লেইন টেক্সট | **প্লেইন টেক্সট (অ্যাস্কি)** | বাইনারি ফ্রেমিং |
+| **হেডার কম্প্রেশন** | নেই | **নেই (প্রতি রিকোয়েস্টে ফুল হেডার)** | HPACK অ্যালগরিদম |
+| **মাল্টিপ্লেক্সিং** | নেই | ❌ পাইপলাইনিং ব্যর্থ (HoL Blocking) | ✅ পূর্ণাঙ্গ স্ট্রিম মাল্টিপ্লেক্সিং |
+| **সমান্তরাল সক্ষমতা** | ১টি কানেকশনে ১টি | ৬টি সমান্তরাল টিসিপি সকেট | ১টি টিসিপিতে শত শত স্ট্রিম |
 
-### Failure modes
+---
 
-- Failure:
-- Detection:
-- Mitigation:
+### 6. Failure Modes & Production Mitigations
 
-## Design questions
+#### Failure Mode 1: Slowloris Denial of Service (DoS)
+- **ঝুঁকি:** আক্রমণকারী খুব ধীর গতিতে প্রতি ১০ সেকেন্ডে ১টি করে অসম্পূর্ণ HTTP হেডার পাঠায় (`X-Header: val\r\n`)। রিভার্স প্রক্সি বা অ্যাপাচে সার্ভার পুরো হেডার না পাওয়া পর্যন্ত থ্রেড ওপেন রাখে। কয়েকশ ক্লায়েন্ট দিয়ে পুরো সার্ভারের সমস্ত থ্রেড শেষ করে সার্ভার ডাউন করে দেওয়া যায়।
+- **প্রতিরোধ (Mitigation):** Nginx-এ `client_header_timeout 5s;` এবং `client_body_timeout 10s;` কনফিগার করা।
 
-1. What requirement makes HTTP/1.1 relevant?
-2. What changes at 10x traffic or data volume?
-3. What should be measured in production?
-4. What decision would make you replace this approach?
+---
 
-## Practice
+### 7. Senior / Staff Engineer Interview Defense
 
-Apply this topic to the exercise in the [Module 02 guide](../02-networking.md), then record the decision and its trade-offs.
+> **ইন্টারভিউয়ার:** *"HTTP/1.1-এর ক্ষেত্রে 'Domain Sharding', 'Image Spriting', এবং 'CSS/JS Concatenation' কেন জনপ্রিয় কৌশল ছিল? HTTP/2-তে এসে এগুলো কেন উল্টো অ্যান্টি-প্যাটার্ন হয়ে গেল?"*
+>
+> 💡 **Staff-Level উত্তরের কাঠামো:**
+> "এটি ওয়েব প্রোটোকলের বিবর্তনের একটি সবচেয়ে গুরুত্বপূর্ণ স্থাপত্যিক দৃষ্টান্ত:
+> 1. **HTTP/1.1-এর সীমাবদ্ধতার কারণে ওয়ার্কঅ্যারাউন্ড:**
+>    - HTTP/1.1-এ ব্রাউজার হোস্ট-প্রতি মাত্র ৬টি টিসিপি সকেট খুলতে পারত এবং প্রতি সকেটে Head-of-Line Blocking ছিল।
+>    - তাই ডেভেলপাররা ৫০টি ছোট আইকনকে একটি বড় ছবিতে একত্রিত করত (**CSS Sprites**), ১০টি জাভাস্ক্রিপ্ট ফাইলকে একটি ফাইলে বান্ডিল করত (**Concatenation**), এবং ট্রাফিককে ৪টি সাবডোমেনে ভাগ করত (**Domain Sharding**) যাতে রাউন্ড-ট্রিপ ও টিসিপি কানেকশন বাধার প্রভাব কমানো যায়।
+> 2. **HTTP/2-তে এগুলো কেন ক্ষতিকর (Anti-pattern):**
+>    - **ক্যাশিং এফিশিয়েন্সি নষ্ট হওয়া:** আপনি যদি সমস্ত কোড একটি `bundle.js` ফাইলে রাখেন, তবে মাত্র ১ লাইনের কোড বদলালে পুরো ৫ মেগাবাইট ফাইল ক্লায়েন্টকে পুনরায় রি-ডাউনলোড করতে হয়।
+>    - **মাল্টিপ্লেক্সিং সুবিধা ধ্বংস:** HTTP/2 একক টিসিপি কানেকশনে কোনো অতিরিক্ত হ্যান্ডশেক ওভারহেড ছাড়াই সমান্তরালভাবে শত শত ছোট ফাইল স্ট্রিম করতে পারে। ফলে ছোট ছোট মডুলার ফাইল আলাদা রাখা অনেক বেশি ক্যাশেবল এবং দ্রুততর।
+>    - **ডোমেন শার্ডিংয়ের ক্ষতি:** ভিন্ন ভিন্ন ডোমেন ব্যবহার করলে HTTP/2 প্রতিটি ডোমেনের জন্য আলাদা আলাদা টিসিপি কানেকশন খুলতে বাধ্য হয়, যা HTTP/2-এর একক কানেকশন মাল্টিপ্লেক্সিং ও HPACK হেডার কম্প্রেশনের সুবিধাকে পুরোপুরি পণ্ড করে দেয়।"
 
+---
+
+## 📝 Practice Questions
+
+```markdown
+### Basic Practice Questions
+1. HTTP/1.0 এবং HTTP/1.1-এর মধ্যকার মূল প্রযুক্তিগত অগ্রগতি কী ছিল?
+2. HTTP Keep-Alive হেডার কীভাবে কাজ করে?
+3. ব্রাউজারে একটি একক ডোমেইনের জন্য সর্বোচ্চ কতটি সমান্তরাল টিসিপি কানেকশন সীমাবদ্ধ থাকে?
+4. Chunked Transfer Encoding কী এবং এটি কখন ব্যবহৃত হয়?
+5. HTTP Status Code 100 Continue কী নির্দেশ করে?
+
+### Intermediate Practice Questions
+6. HTTP Pipelining কেন ডিজাইন করা হয়েছিল এবং কেন আধুনিক ব্রাউজারগুলো এটি পুরোপুরি নিষিদ্ধ করেছে?
+7. Application-level Head-of-Line (HoL) Blocking বলতে কী বোঝায়?
+8. Domain Sharding কী এবং কেন HTTP/1.1 যুগে এটি ব্যাপকভাবে ব্যবহৃত হতো?
+9. Slowloris আক্রমণ কীভাবে কাজ করে এবং HTTP/1.1 ওয়েব সার্ভার কীভাবে এটি থেকে নিজেকে রক্ষা করে?
+10. HTTP/1.1-এ হেডার কম্প্রেশন না থাকার কারণে মোবাইল নেটওয়ার্কে ব্যান্ডউইথ অপচয়ের মাত্রা কেমন ছিল?
+
+### Advanced / Staff-Level Questions
+11. Nginx বা Envoy প্রক্সিতে আপস্ট্রিম সার্ভারের সাথে যোগাযোগে HTTP/1.1 Connection Pooling কীভাবে কনফিগার করা হয় যাতে টিসিপি সকেট রিসাইক্লিং নিখুঁত থাকে?
+12. ওয়েব ব্রাউজারের "Preconnect" এবং "DNS-Prefetch" রিসোর্স হিন্টস HTTP/1.1-এর কানেকশন সেটআপ ল্যাটেন্সিকে কীভাবে প্রশমিত করত?
+13. HTTP/1.1 হেডার পার্সিংয়ে রিকোয়েস্ট স্মাগলিং (HTTP Request Smuggling - CL.TE vs TE.CL) নিরাপত্তা দুর্বলতা কীভাবে সৃষ্টি হয় এবং আধুনিক প্রক্সিতে এটি কীভাবে প্রতিরোধ করবেন?
+14. Server-Sent Events (SSE) কীভাবে HTTP/1.1-এর Chunked Transfer Encoding এবং দীর্ঘস্থায়ী কানেকশন ব্যবহার করে ক্লায়েন্টে রিয়েল-টাইম ইভেন্ট পুশ করে?
+15. একটি বিশাল লিগ্যাসি মনোলিথিক সিস্টেমকে HTTP/1.1 থেকে HTTP/2 বা HTTP/3-তে রূপান্তর করার সময় ফ্রন্টএন্ড বান্ডিলিং এবং সিডিএন কনফিগারেশনে কী কী মৌলিক পরিবর্তন আনতে হয়?
+```
+
+---
+
+## 🔑 Answer Key & Self-Test Evaluation
+
+<details>
+<summary>👉 <b>Answer Key ও সমাধান দেখতে এখানে ক্লিক করুন</b></summary>
+
+1. **অগ্রগতি:** Persistent Connections (HTTP Keep-Alive) ডিফল্ট করা, হোস্ট হেডার বাধ্যতামূলক করা, এবং Chunked Encoding আনা।
+2. **Keep-Alive:** রিকোয়েস্ট শেষ হলেও টিসিপি সকেট ওপেন রাখা, যাতে পরবর্তী রিকোয়েস্ট কোনো নতুন ৩-ওয়ে হ্যান্ডশেক ছাড়া অবিলম্বে পাঠানো যায়।
+3. **ব্রাউজার লিমিট:** ৬টি টিসিপি কানেকশন (ডোমেন-প্রতি)।
+4. **Chunked Encoding:** সাইজ আগে থেকে না জেনে ডেটাকে ছোট ছোট ব্লকে পাঠানো। লাইভ ডেটা বা বড় ফাইল স্ট্রিমিংয়ে ব্যবহৃত হয়।
+5. **100 Continue:** ক্লায়েন্ট বড় পে-লোড (যেমন ফাইল আপলোড) পাঠানোর আগে হেডার পাঠিয়ে সার্ভারের সম্মতি চায়; সার্ভার এক্সেপ্ট করতে প্রস্তুত থাকলে `100` দেয়।
+6. **Pipelining ব্যর্থতা:** সার্ভারকে ক্রমানুসারেই রেসপন্স দিতে হতো; ১ম রিকোয়েস্ট স্লো হলে পরেরগুলো আটকে থাকত (HoL Blocking) এবং মিডলবক্সগুলো প্যাকেট করাপ্ট করত।
+7. **App-level HoL Blocking:** আগের রিকোয়েস্ট প্রসেস না হওয়া পর্যন্ত পরের রিকোয়েস্টের রেসপন্স না পাওয়ার কারণে কিউতে আটকে থাকা।
+8. **Domain Sharding:** এসেটগুলোকে একাধিক সাবডোমেনে ভাগ করা যাতে ব্রাউজার ৬টি করে অতিরিক্ত কানেকশন খুলে মোট ২৪টি ফাইলে সমান্তরাল স্পিড পায়।
+9. **Slowloris Defense:** আক্রমণকারী ধীরে ধীরে অসম্পূর্ণ হেডার পাঠিয়ে থ্রেড আটকে রাখে। প্রতিরোধ: হেডারের জন্য কঠোর টাইমআউট (`client_header_timeout 5s`) রাখা।
+10. **হেডার ওভারহেড:** প্রতি রিকোয়েস্টে কুকি ও ইউজার-এজেন্ট সহ ১-২ কেবি টেক্সট হেডার আন-কম্প্রেসড যেত, যা মোবাইল ডেটাতে প্রচুর ব্যান্ডউইথ নষ্ট করত।
+11. **Connection Pooling:** Nginx-এ `upstream` ব্লকে `keepalive 64;` এবং লোকেশনে `proxy_http_version 1.1; proxy_set_header Connection "";` দিয়ে সকেট রি-ইউজ করা।
+12. **Preconnect:** ব্রাউজার লিংক পড়ার সাথে সাথে ব্যাকগ্রাউন্ডে আগেই ডিএনএস ও টিসিপি হ্যান্ডশেক শেষ করে রাখে, ফলে ক্লিক করলে শূন্য ল্যাটেন্সিতে ডেটা যায়।
+13. **Request Smuggling:** ফ্রন্টএন্ড ও ব্যাকএন্ডের মধ্যে `Content-Length` বনাম `Transfer-Encoding`-এর প্রায়োরিটি মিসম্যাচ কাজে লাগিয়ে অন্য ইউজারের রিকোয়েস্টে ক্ষতিকর পে-লোড ইনজেক্ট করা। প্রতিরোধ: টিই হেডার ড্রপ করা ও HTTP/2 ব্যবহার।
+14. **SSE মেকানিজম:** কানেকশন ক্লোজ না করে `Transfer-Encoding: chunked` এবং `Content-Type: text/event-stream` দিয়ে সার্ভার ইচ্ছামতো টেক্সট লাইন পুশ করে।
+15. **Migration Changes:** ফাইল বান্ডিলিং ও কনক্যাটেনেশন বাদ দিয়ে ছোট মডুলার ES মডিউলে যাওয়া, ডোমেন শার্ডিং বন্ধ করে একক ডোমেনে আনা, এবং সিডিএনে TLS ALPN এনাবল করা।
+
+</details>
