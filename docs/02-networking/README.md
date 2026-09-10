@@ -6,6 +6,14 @@ Welcome to the topic-wise deep-dive study guide directory for **Module 02: Netwo
 
 ---
 
+## 📘 Download the Visual PDF Guide
+
+[**Networking: A Visual Guide — by Masud Rana**](../../output/pdf/networking-visual-guide-masud-rana.pdf)
+
+This polished 22-page handbook includes a designed cover, a categorized table of contents, and one easy-to-understand page with a minimal flow chart for every networking topic in this module.
+
+---
+
 ## 🗺️ Networking Topic Relationship Map
 
 ```mermaid
