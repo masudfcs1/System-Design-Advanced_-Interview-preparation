@@ -12,6 +12,31 @@
 
 ---
 
+## 🗺️ TCP Connection Lifecycle Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant S as Server
+    C->>S: SYN, seq=x
+    S-->>C: SYN-ACK, seq=y, ack=x+1
+    C->>S: ACK, ack=y+1
+    Note over C,S: ESTABLISHED — byte streams can flow in both directions
+    C->>S: DATA, seq=x+1, len=n
+    S-->>C: ACK, ack=x+n+1
+    Note over C,S: Retransmission, receive window, and congestion window protect delivery
+    C->>S: FIN
+    S-->>C: ACK
+    S-->>C: FIN
+    C->>S: ACK
+    Note over C: TIME_WAIT prevents delayed segments from corrupting a new connection
+```
+
+**Diagram walkthrough:** TCP establishes shared sequence-number state with a three-way handshake, acknowledges an ordered byte stream during transfer, and closes each direction independently. IP only moves packets between hosts; TCP adds reliability, ordering, flow control, and congestion control end to end.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

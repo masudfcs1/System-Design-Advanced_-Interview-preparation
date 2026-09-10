@@ -12,6 +12,29 @@
 
 ---
 
+## 🗺️ HTTPS End-to-End Flow Diagram
+
+```mermaid
+flowchart LR
+    A[User enters https URL] --> B[DNS resolves hostname]
+    B --> C[Transport connection<br/>TCP or QUIC]
+    C --> D[TLS handshake]
+    D --> E{Certificate valid?}
+    E -->|No| F[Browser blocks or warns]
+    E -->|Yes| G[Derive symmetric session keys]
+    G --> H[Encrypted HTTP request]
+    H --> I[Server decrypts and handles request]
+    I --> J[Encrypted HTTP response]
+    J --> K[Browser authenticates and decrypts records]
+    L[HSTS policy] -. forces HTTPS .-> A
+    M[CA trust store] -. validates chain .-> E
+    N[OCSP staple or revocation signal] -. informs status .-> E
+```
+
+**Diagram walkthrough:** HTTPS is HTTP carried inside TLS. The certificate authenticates the requested hostname, ephemeral key exchange creates shared secrets, and fast symmetric cryptography protects subsequent HTTP data for confidentiality and integrity; HSTS prevents an initial downgrade to plain HTTP.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

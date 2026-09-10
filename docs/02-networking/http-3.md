@@ -12,6 +12,31 @@
 
 ---
 
+## 🗺️ HTTP/3 over QUIC Diagram
+
+```mermaid
+flowchart LR
+    A[HTTP semantics] --> B[HTTP/3 framing]
+    B --> C1[Request stream A]
+    B --> C2[Request stream B]
+    B --> C3[Control stream]
+    B --> Q[QPACK encoder and decoder streams]
+    C1 --> D[QUIC encrypted packets]
+    C2 --> D
+    C3 --> D
+    Q --> D
+    D --> U[UDP / IP]
+    U --> L{Packet loss}
+    L -->|Stream A data lost| R[Recover Stream A bytes]
+    L -->|Other data received| K[Deliver unaffected streams immediately]
+    R --> E[HTTP response A]
+    K --> F[HTTP response B and control data]
+```
+
+**Diagram walkthrough:** HTTP/3 maps each exchange onto QUIC streams instead of placing every byte in one TCP sequence. QUIC still provides reliable ordered bytes within a stream, while loss recovery for one stream does not stop unrelated streams; QPACK coordinates compressed headers without recreating HTTP/2’s blocking behavior.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

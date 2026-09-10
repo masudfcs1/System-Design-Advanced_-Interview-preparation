@@ -6,6 +6,33 @@ Welcome to the topic-wise deep-dive study guide directory for **Module 02: Netwo
 
 ---
 
+## 🗺️ Networking Topic Relationship Map
+
+```mermaid
+flowchart TD
+    U[User or service] --> DNS[DNS<br/>name resolution]
+    DNS --> EDGE[CDN or origin routing]
+    EDGE --> T{Transport}
+    T --> TCP[TCP]
+    T --> UDP[UDP]
+    UDP --> QUIC[QUIC + TLS 1.3]
+    TCP --> TLS[TLS]
+    TLS --> H1[HTTP/1.1]
+    TLS --> H2[HTTP/2]
+    QUIC --> H3[HTTP/3]
+    H1 --> API[REST, GraphQL, or browser traffic]
+    H2 --> API
+    H2 --> GRPC[gRPC]
+    H3 --> API
+    API --> ID[OAuth 2.0, JWT, sessions, cookies]
+    API --> RT[SSE or WebSocket]
+    ID --> POLICY[CORS and browser security policy]
+```
+
+The map shows how the guides fit together: naming and edge routing select a destination, transport moves data, TLS protects it, application protocols define message semantics, and identity or browser controls decide who may use the resulting capabilities.
+
+---
+
 ## 📚 Categorized Topic Map
 
 ### ১. Transport Layer Protocols (ট্রান্সপোর্ট লেয়ার প্রোটোকল)

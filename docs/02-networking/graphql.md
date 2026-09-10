@@ -12,6 +12,34 @@
 
 ---
 
+## 🗺️ GraphQL Execution Diagram
+
+```mermaid
+flowchart LR
+    C1[Web client] --> E[Single GraphQL endpoint]
+    C2[Mobile client] --> E
+    C3[Partner client] --> E
+    E --> P[Parse operation]
+    P --> V{Validate schema, auth,<br/>depth and complexity}
+    V -->|Rejected| X[GraphQL errors]
+    V -->|Accepted| Q[Build execution plan]
+    Q --> R[Run field resolvers]
+    R --> D[DataLoader<br/>batch and per-request cache]
+    D --> S1[User service]
+    D --> S2[Catalog service]
+    D --> S3[(Database)]
+    S1 --> O[Shape response to selection set]
+    S2 --> O
+    S3 --> O
+    O --> C1
+    O --> C2
+    O --> C3
+```
+
+**Diagram walkthrough:** The client supplies a selection set, but the server first validates it against the schema and operational limits. Resolvers assemble fields from multiple sources, while request-scoped batching avoids N+1 calls; field-level authorization and cost controls must apply even when the top-level query is valid.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

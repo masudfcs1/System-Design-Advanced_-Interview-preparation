@@ -12,6 +12,32 @@
 
 ---
 
+## 🗺️ Server-Sent Events Streaming Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser EventSource
+    participant P as Proxy or load balancer
+    participant S as Application server
+    participant E as Event source
+    B->>P: GET /events, Accept: text/event-stream
+    P->>S: Forward long-lived request
+    S-->>B: 200 OK, text/event-stream
+    E-->>S: New event
+    S-->>B: id: 41 + event/data fields
+    E-->>S: New event
+    S-->>B: id: 42 + event/data fields
+    Note over B,S: Comments can act as heartbeats; proxy buffering must be disabled
+    P--xB: Connection interrupted
+    B->>P: Reconnect with Last-Event-ID: 42
+    P->>S: Resume stream after event 42
+```
+
+**Diagram walkthrough:** SSE keeps one HTTP response open and sends UTF-8 event records from server to browser. `EventSource` reconnects automatically and can present the last received ID, but the server must retain or reconstruct missed events and infrastructure must avoid buffering the stream.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

@@ -12,6 +12,31 @@
 
 ---
 
+## 🗺️ Distributed Session Architecture Diagram
+
+```mermaid
+flowchart LR
+    U[Browser] -->|Secure HttpOnly cookie<br/>opaque session ID| L[Load balancer]
+    L --> A1[Application instance A]
+    L --> A2[Application instance B]
+    L --> A3[Application instance C]
+    A1 --> R[(Replicated Redis session store)]
+    A2 --> R
+    A3 --> R
+    R --> D[(User and authorization database)]
+    A1 --> P{Session valid?}
+    A2 --> P
+    A3 --> P
+    P -->|Missing, expired, or revoked| X[Return 401 and clear cookie]
+    P -->|Valid| T[Rotate or refresh according to policy]
+    T --> Z[Serve authorized response]
+    Q[Logout all devices or security event] -->|Delete user session set| R
+```
+
+**Diagram walkthrough:** The cookie holds an unpredictable identifier while mutable session state lives in a shared server-side store, so any application instance can handle the request. Absolute and idle expirations, ID rotation after privilege changes, and a per-user session index support containment and global logout.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

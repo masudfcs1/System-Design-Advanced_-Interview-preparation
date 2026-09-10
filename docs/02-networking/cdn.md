@@ -12,6 +12,32 @@
 
 ---
 
+## 🗺️ CDN Request and Cache-Fill Diagram
+
+```mermaid
+flowchart LR
+    U1[User in Asia] --> P1[Nearest edge PoP]
+    U2[User in Europe] --> P2[Nearest edge PoP]
+    U3[User in America] --> P3[Nearest edge PoP]
+    P1 --> H1{Fresh cache entry?}
+    P2 --> H2{Fresh cache entry?}
+    P3 --> H3{Fresh cache entry?}
+    H1 -->|Yes| R1[Serve immediately]
+    H2 -->|Yes| R2[Serve immediately]
+    H3 -->|Yes| R3[Serve immediately]
+    H1 -->|No| S[Origin shield or regional cache]
+    H2 -->|No| S
+    H3 -->|No| S
+    S --> O{Shield cache hit?}
+    O -->|Yes| F[Return object and fill edge]
+    O -->|No| G[Fetch once from origin]
+    G --> F
+```
+
+**Diagram walkthrough:** DNS or Anycast routes each user to a nearby point of presence. Fresh objects are served at the edge; misses are coalesced through a shield so the origin sees fewer duplicate requests, after which cache headers determine freshness, revalidation, and eviction behavior.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

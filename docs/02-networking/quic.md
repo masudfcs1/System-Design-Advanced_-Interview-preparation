@@ -12,6 +12,35 @@
 
 ---
 
+## 🗺️ QUIC Connection and Stream Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant S as QUIC Server
+    C->>S: UDP Initial + TLS 1.3 ClientHello
+    S-->>C: Initial + ServerHello + certificate
+    C->>S: Handshake Finished
+    Note over C,S: Encryption and transport are established together
+    par Independent stream 1
+        C->>S: STREAM 1 — API request
+        S-->>C: STREAM 1 — response
+    and Independent stream 2
+        C->>S: STREAM 2 — image request
+        S-->>C: STREAM 2 — response
+    end
+    Note over C,S: Loss on one stream does not block delivery on another
+    C->>S: New network path, same Connection ID
+    S-->>C: PATH_CHALLENGE
+    C->>S: PATH_RESPONSE
+    Note over C,S: Connection continues after Wi-Fi/cellular migration
+```
+
+**Diagram walkthrough:** QUIC combines TLS 1.3 and transport negotiation, multiplexes independently recoverable streams, and identifies a connection with IDs instead of only an IP/port tuple. A resumed connection may send safe replay-tolerant data with 0-RTT, but fresh connections normally use 1-RTT setup.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

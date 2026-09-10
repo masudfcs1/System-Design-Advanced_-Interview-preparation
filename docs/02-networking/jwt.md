@@ -12,6 +12,28 @@
 
 ---
 
+## 🗺️ JWT Issuance and Verification Diagram
+
+```mermaid
+flowchart LR
+    U[Authenticated user or service] --> I[Authorization server]
+    I --> C[Create header and claims<br/>iss, sub, aud, exp, jti]
+    C --> S[Sign encoded header.payload]
+    S --> T[Compact JWT]
+    T --> A[Client presents Bearer token]
+    A --> G[API gateway or resource server]
+    G --> K[Select trusted key by iss and kid]
+    K --> V{Verify signature and claims}
+    V -->|Invalid, expired, wrong audience| X[Reject request]
+    V -->|Valid| Z[Apply scopes and authorization policy]
+    R[JWKS endpoint and key rotation] -. supplies public keys .-> K
+    D[Revocation list or short TTL] -. limits stolen-token lifetime .-> V
+```
+
+**Diagram walkthrough:** A JWT is signed, not automatically encrypted. A resource server must pin allowed algorithms, verify the signature with a trusted issuer key, and validate time, issuer, audience, and authorization claims before trusting the payload; short lifetimes reduce the stateless revocation gap.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

@@ -12,6 +12,35 @@
 
 ---
 
+## 🗺️ Browser CORS Decision Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant JS as JavaScript at app.example
+    participant B as Browser CORS engine
+    participant API as api.example
+    JS->>B: Cross-origin fetch
+    alt Non-simple method, headers, or content type
+        B->>API: OPTIONS preflight with Origin and requested method/headers
+        API-->>B: Allowed origin, methods, headers, and max-age
+        alt Preflight policy allows request
+            B->>API: Actual request with Origin
+            API-->>B: Response + Access-Control-Allow-Origin
+        else Preflight denied
+            B-->>JS: CORS error; actual request is not sent
+        end
+    else Simple request
+        B->>API: Actual request with Origin
+        API-->>B: Response + CORS headers
+    end
+    B-->>JS: Expose response only when policy permits
+```
+
+**Diagram walkthrough:** CORS is enforced by browsers when JavaScript reads a cross-origin response. Preflight asks the server for permission before potentially unsafe request shapes; non-browser clients are not constrained by CORS, so the API still needs authentication, authorization, and CSRF defenses where applicable.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

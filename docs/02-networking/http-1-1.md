@@ -12,6 +12,30 @@
 
 ---
 
+## 🗺️ HTTP/1.1 Request Flow Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant C as Persistent TCP connection
+    participant S as Web server
+    B->>C: Request 1: GET /index.html
+    C->>S: HTTP text message
+    S-->>C: Response 1
+    C-->>B: Status + headers + body
+    B->>C: Request 2: GET /app.css
+    Note over B,S: Without safe multiplexing, response order follows request order
+    C->>S: HTTP text message
+    S-->>C: Response 2
+    C-->>B: Status + headers + body
+    Note over B,S: Browsers open several connections to gain parallelism
+```
+
+**Diagram walkthrough:** Keep-alive lets requests reuse a TCP connection, avoiding a handshake per object. However, HTTP/1.1 has no broadly deployed multiplexing, so a slow response can delay later work on that connection and browsers compensate with a small connection pool per origin.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

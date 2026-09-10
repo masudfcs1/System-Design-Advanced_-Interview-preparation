@@ -12,6 +12,30 @@
 
 ---
 
+## 🗺️ TLS 1.3 Handshake Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as TLS Client
+    participant S as TLS Server
+    C->>S: ClientHello + supported suites + key share
+    S-->>C: ServerHello + chosen suite + key share
+    Note over C,S: ECDHE produces a shared handshake secret
+    S-->>C: EncryptedExtensions
+    S-->>C: Certificate + CertificateVerify
+    S-->>C: Finished
+    C->>C: Validate chain, hostname, time, and signature
+    C->>S: Finished
+    Note over C,S: Application traffic now uses authenticated symmetric encryption
+    C->>S: Encrypted application data
+    S-->>C: Encrypted application data
+```
+
+**Diagram walkthrough:** TLS 1.3 removes obsolete key exchanges and negotiates ephemeral ECDHE keys in the first round trip. The certificate binds the server identity to its public key, transcript verification detects tampering, and derived traffic keys provide confidentiality, integrity, and forward secrecy.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

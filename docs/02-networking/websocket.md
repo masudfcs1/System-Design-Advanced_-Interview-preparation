@@ -12,6 +12,30 @@
 
 ---
 
+## 🗺️ Scalable WebSocket Architecture Diagram
+
+```mermaid
+flowchart LR
+    C1[Web client 1] -->|HTTP Upgrade then frames| L[Layer 7 load balancer]
+    C2[Mobile client] -->|HTTP Upgrade then frames| L
+    C3[Web client 2] -->|HTTP Upgrade then frames| L
+    L --> W1[WebSocket node A<br/>connection registry]
+    L --> W2[WebSocket node B<br/>connection registry]
+    L --> W3[WebSocket node C<br/>connection registry]
+    W1 <--> P[(Pub/Sub or event broker)]
+    W2 <--> P
+    W3 <--> P
+    P <--> S[Application services]
+    W1 --> H[Heartbeat and idle-timeout checks]
+    W2 --> H
+    W3 --> H
+    H --> R[Reconnect with backoff and resume token]
+```
+
+**Diagram walkthrough:** After the HTTP Upgrade, each client owns a long-lived full-duplex connection to one node. A broker fans messages across nodes so recipients need not share a process, while heartbeats, backpressure, bounded queues, and reconnect/resume logic handle half-open or overloaded connections.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

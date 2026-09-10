@@ -12,6 +12,30 @@
 
 ---
 
+## 🗺️ Cookie Storage and Sending Diagram
+
+```mermaid
+flowchart LR
+    S[Server response<br/>Set-Cookie] --> B[Browser cookie jar]
+    B --> V{Cookie accepted?}
+    V -->|Invalid domain, policy, or security rule| X[Discard]
+    V -->|Yes| M[Store name, value, domain, path, expiry, flags]
+    R[Later HTTP request] --> Q{Domain and path match?}
+    M --> Q
+    Q -->|No| N[Do not attach]
+    Q -->|Yes| SS{SameSite context allowed?}
+    SS -->|No| N
+    SS -->|Yes| SEC{Secure requirement met?}
+    SEC -->|No| N
+    SEC -->|Yes| H[Attach Cookie header]
+    H --> A[Server authenticates session]
+    J[Page JavaScript] -. blocked by HttpOnly .-> M
+```
+
+**Diagram walkthrough:** The browser, not application JavaScript, decides when a stored cookie is attached. Domain, path, expiry, `Secure`, and `SameSite` control sending; `HttpOnly` prevents script reads but does not stop the browser from sending the cookie, so state-changing endpoints still require CSRF-aware design.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

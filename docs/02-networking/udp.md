@@ -12,6 +12,29 @@
 
 ---
 
+## 🗺️ UDP Delivery Model Diagram
+
+```mermaid
+flowchart LR
+    A[Application<br/>DNS, voice, gaming, telemetry] --> B[UDP socket]
+    B --> C[8-byte UDP header<br/>ports, length, checksum]
+    C --> D[IP datagram]
+    D --> N{Network outcome}
+    N -->|Normal| E[Receiver gets datagram]
+    N -->|Congestion or corruption| F[Datagram dropped]
+    N -->|Multiple paths| G[Reordered or duplicated]
+    E --> H[Receiving application]
+    F --> I[Application decides whether to retry]
+    G --> J[Application detects sequence issues]
+    H --> K[Optional app-level reliability<br/>ACK, FEC, jitter buffer]
+    I --> K
+    J --> K
+```
+
+**Diagram walkthrough:** UDP preserves message boundaries and adds ports plus a checksum, but it does not create a connection or promise delivery order. When an application needs recovery, pacing, or duplicate detection, it implements those features itself or uses a UDP-based protocol such as QUIC.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

@@ -12,6 +12,34 @@
 
 ---
 
+## 🗺️ Authorization Code with PKCE Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Resource Owner
+    participant B as Browser
+    participant C as OAuth Client
+    participant AS as Authorization Server
+    participant API as Resource Server
+    U->>C: Start sign-in or connect account
+    C->>C: Create code_verifier and code_challenge
+    C->>B: Redirect with state and code_challenge
+    B->>AS: Authorization request
+    AS->>U: Authenticate and ask for consent
+    U->>AS: Approve requested scopes
+    AS-->>B: Redirect with authorization code and state
+    B-->>C: Deliver callback
+    C->>AS: Exchange code + code_verifier
+    AS-->>C: Access token and optional ID/refresh token
+    C->>API: Bearer access token
+    API-->>C: Protected resource
+```
+
+**Diagram walkthrough:** The front channel carries only a short-lived authorization code; the token exchange happens directly with the authorization server. PKCE binds a stolen code to the client that created the verifier, while `state` protects the callback against request forgery and mix-up attacks.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

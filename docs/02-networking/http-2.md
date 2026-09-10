@@ -13,6 +13,30 @@
 
 ---
 
+## 🗺️ HTTP/2 Multiplexing Diagram
+
+```mermaid
+flowchart LR
+    A[HTTP request A] --> S1[Stream 1 frames]
+    B[HTTP request B] --> S3[Stream 3 frames]
+    C[HTTP response C] --> S5[Stream 5 frames]
+    S1 --> M[Binary framing and multiplexing]
+    S3 --> M
+    S5 --> M
+    H[Repeated headers] --> P[HPACK dynamic table]
+    P --> M
+    M --> T[One ordered TCP connection]
+    T --> N{Packet loss?}
+    N -->|No| D[Demultiplex frames by Stream ID]
+    N -->|Yes| R[TCP retransmits missing bytes]
+    R --> D
+    D --> O[Independent HTTP messages]
+```
+
+**Diagram walkthrough:** HTTP/2 splits messages into binary frames and interleaves many logical streams on one TCP connection; HPACK compresses repeated headers. The streams are independent at the HTTP layer, but a missing TCP segment pauses all later bytes until retransmission, creating transport-level head-of-line blocking.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

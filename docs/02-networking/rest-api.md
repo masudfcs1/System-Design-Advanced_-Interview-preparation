@@ -12,6 +12,28 @@
 
 ---
 
+## 🗺️ REST Resource Request Diagram
+
+```mermaid
+flowchart LR
+    C[Client] -->|HTTP method + resource URI<br/>headers + representation| G[API gateway]
+    G --> A[Authenticate, authorize, rate-limit]
+    A --> R[Resource controller]
+    R --> D[Domain service]
+    D --> DB[(Database or downstream service)]
+    DB --> D
+    D --> P[Resource representation]
+    P --> H[Status code + headers<br/>ETag, Cache-Control, Location]
+    H --> C
+    C -->|If-None-Match or If-Match| G
+    I[Idempotency key store] -. protects retried mutations .-> R
+    K[Shared cache] -. serves cacheable GET/HEAD .-> G
+```
+
+**Diagram walkthrough:** A REST API exposes resources through standard HTTP semantics rather than transport-specific operation names. Methods, status codes, cache validators, and representations form the contract; authorization remains server-side, and idempotency keys make ambiguous retries safer for selected mutations.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

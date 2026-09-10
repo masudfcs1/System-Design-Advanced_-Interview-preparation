@@ -12,6 +12,32 @@
 
 ---
 
+## 🗺️ gRPC Call Pipeline Diagram
+
+```mermaid
+flowchart LR
+    A[Client application] --> B[Generated client stub]
+    B --> C[Protobuf serialization]
+    C --> D[Length-prefixed gRPC messages]
+    D --> E[HTTP/2 stream]
+    E --> F[Generated server stub]
+    F --> G[Service handler]
+    G --> H[(Database or downstream service)]
+    H --> G
+    G --> I[Protobuf response messages]
+    I --> J[HTTP/2 DATA frames]
+    J --> K[Final trailers<br/>grpc-status and grpc-message]
+    K --> L[Client result]
+    M{RPC shape} -->|Unary| E
+    M -->|Server stream| E
+    M -->|Client stream| E
+    M -->|Bidirectional stream| E
+```
+
+**Diagram walkthrough:** Generated stubs turn typed method calls into compact Protobuf messages carried on HTTP/2 streams. The same framing supports unary and streaming RPCs; deadlines, cancellation, status trailers, retry policy, and backward-compatible field evolution are essential parts of the production contract.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model

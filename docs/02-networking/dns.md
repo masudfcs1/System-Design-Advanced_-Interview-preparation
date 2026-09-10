@@ -12,6 +12,35 @@
 
 ---
 
+## 🗺️ DNS Resolution Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant R as Recursive Resolver
+    participant Root as Root Server
+    participant TLD as .com TLD
+    participant A as Authoritative Server
+    C->>R: A api.example.com?
+    alt Cached and TTL valid
+        R-->>C: Cached IP address
+    else Cache miss
+        R->>Root: A api.example.com?
+        Root-->>R: Referral to .com nameservers
+        R->>TLD: A api.example.com?
+        TLD-->>R: Referral to example.com nameservers
+        R->>A: A api.example.com?
+        A-->>R: 203.0.113.10, TTL 300
+        R->>R: Cache answer for up to 300 seconds
+        R-->>C: 203.0.113.10
+    end
+```
+
+**Diagram walkthrough:** The client asks one recursive resolver for a complete answer. On a miss, that resolver follows iterative referrals from the root to the TLD and then the domain’s authoritative server; caching at each level reduces latency and load until the relevant TTL expires.
+
+---
+
 ## 📖 Deep Dive Notes
 
 ### 1. সহজ সংজ্ঞা ও Intuitive Mental Model
